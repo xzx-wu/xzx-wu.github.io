@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="基于 Spring Boot 1.5.10 配置 Druid 数据源、监控控制台、过滤器和连接池参数。">
+  <meta name="keywords" content="Spring Boot,Druid,数据源,Java 与工程">
+  <meta name="article:realm" content="java-engineering">
+  <title>Spring Boot 配置 Druid · Arcane Archive</title>
+  <link rel="icon" type="image/png" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-4">
+</head>
+<body>
+  <div class="detail-shell">
+    <div class="frame-lines" aria-hidden="true"></div>
+    <img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="" aria-hidden="true">
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="主导航">
+        <a class="brand" href="../../../index.html">
+          <img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt="" aria-hidden="true">
+          <span>xzx-wu</span><small>Arcane Archive</small>
+        </a>
+        <div class="nav-links">
+          <a href="../../../index.html">首页</a>
+          <a class="is-active" href="../../index.html" aria-current="page">知识卷轴</a>
+          <a href="../../../journeys/index.html">学习旅程</a>
+          <a href="../../../about/index.html">关于</a>
+          <a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon" aria-hidden="true"></span>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero article-hero--engineering">
+          <div class="article-hero__shade" aria-hidden="true"></div>
+          <div class="article-hero__inner">
+            <div class="article-hero__copy">
+              <nav class="breadcrumb" aria-label="面包屑导航"><a href="../../index.html">知识卷轴</a><span aria-hidden="true">✦</span><span>Java 与工程</span></nav>
+              <p class="article-kicker">ENGINEERING · DATABASE POOL</p>
+              <h1>Spring Boot<br>配置 Druid</h1>
+              <p class="article-deck">在早期 Spring Boot 项目中注册数据源、监控 Servlet 与过滤器，并通过 YAML 管理连接池参数。</p>
+              <div class="article-meta" aria-label="文章信息">
+                <time datetime="2018-08-01">2018-08-01</time>
+                <span>Java 与工程</span>
+                <span>约 10 分钟阅读</span>
+              </div>
+            </div>
+            <div class="chapter-seal" aria-label="工程档案第 06 篇"><span>ENGINEERING LOG</span><strong>06</strong><small>DATA SOURCE</small></div>
+          </div>
+        </header>
+
+        <div class="reading-stage">
+          <div class="reading-layout">
+            <aside class="reading-sidebar reading-sidebar--toc">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2>
+                <nav class="article-toc" aria-label="文章目录">
+                  <a href="#background"><span>01</span>Druid 与项目背景</a>
+                  <a href="#dependency"><span>02</span>引入 Maven 依赖</a>
+                  <a href="#java-config"><span>03</span>注册监控、过滤器与数据源</a>
+                  <a href="#yaml"><span>04</span>配置连接池参数</a>
+                  <a href="#console"><span>05</span>访问 Druid 监控页面</a>
+                  <a href="#references"><span>06</span>迁移说明与来源</a>
+                </nav>
+                <a class="back-link" href="../../index.html">← 返回知识卷轴</a>
+              </div>
+            </aside>
+
+            <div class="article-body">
+              <section class="opening-note"><span class="opening-note__mark" aria-hidden="true">“</span><div><p>连接池配置既影响数据库访问，也决定监控、安全边界和故障排查体验。</p><small>历史工程档案 · Druid 1.1.10</small></div></section>
+
+              <section class="article-section" id="background">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><p>BACKGROUND</p><h2>Druid 与项目背景</h2></div>
+                </header>
+                <div class="article-callout">
+                  <strong>版本背景</strong>
+                  <p>示例环境为 JDK 8、Spring Boot 1.5.10 与 Druid 1.1.10。DataSourceBuilder 包名、Servlet 注册方式和推荐配置会随版本变化。</p>
+                </div>
+                <p>Druid是阿里托管于 GitHub 的开源的数据库链接池工具，他封装提供并聚合了各种统计，通过简单的配置就可以实现sql防火墙和防注入功能，是当下最强大，功能最全的数据库连接池工具。</p>
+                <p>因项目需要，配置了连接池，现项目上线，特此记录下，方便以后使用。</p>
+                <p>相关环境版本：jdk版本1.8，springboot版本1.5.10，druid版本</p>
+              </section>
+              <section class="article-section" id="dependency">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><p>DEPENDENCY</p><h2>引入 Maven 依赖</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 01</span><small>XML</small></div>
+                  <pre><code>&lt;dependency&gt;
+     &lt;groupId&gt;com.alibaba&lt;/groupId&gt;
+     &lt;artifactId&gt;druid&lt;/artifactId&gt;
+     &lt;version&gt;1.1.10&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="java-config">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><p>JAVA CONFIG</p><h2>注册监控、过滤器与数据源</h2></div>
+                </header>
+                <div class="code-block code-block--large">
+                  <div class="code-block__label"><span>示例 02</span><small>JAVA</small></div>
+                  <pre><code>import javax.sql.DataSource;
+ 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceBuilder;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+ 
+import com.alibaba.druid.support.http.StatViewServlet;
+import com.alibaba.druid.support.http.WebStatFilter;
+ 
+/**
+ * ClassName: DruidConfiguration 
+ * Description: 
+ * @date 2018年7月20日  
+ */
+@Configuration
+public class DruidConfiguration {
+ 
+    private static final Logger logger = LoggerFactory.getLogger(DruidConfiguration.class);
+ 
+ 
+    @Bean
+    public ServletRegistrationBean druidServlet() {
+        logger.info(&quot;init Druid Servlet Configuration &quot;);
+        ServletRegistrationBean servletRegistrationBean = new ServletRegistrationBean(new StatViewServlet(), &quot;/druid/*&quot;);
+        // IP白名单
+        servletRegistrationBean.addInitParameter(&quot;allow&quot;, &quot;192.168.2.25,127.0.0.1&quot;);
+        // IP黑名单(共同存在时，deny优先于allow)
+        servletRegistrationBean.addInitParameter(&quot;deny&quot;, &quot;192.168.1.100&quot;);
+        //控制台管理用户
+        servletRegistrationBean.addInitParameter(&quot;loginUsername&quot;, &quot;admin&quot;);
+        servletRegistrationBean.addInitParameter(&quot;loginPassword&quot;, &quot;admin&quot;);
+        //是否能够重置数据 禁用HTML页面上的“Reset All”功能
+        servletRegistrationBean.addInitParameter(&quot;resetEnable&quot;, &quot;false&quot;);
+        return servletRegistrationBean;
+    }
+ 
+    @Bean
+    public FilterRegistrationBean filterRegistrationBean() {
+        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(new WebStatFilter());
+        filterRegistrationBean.addUrlPatterns(&quot;/*&quot;);
+        filterRegistrationBean.addInitParameter(&quot;exclusions&quot;, &quot;*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*&quot;);
+        return filterRegistrationBean;
+    }
+ 
+        @Bean     //声明其为Bean实例
+        @Primary  //在同样的DataSource中，首先使用被标注的DataSource
+        @ConfigurationProperties(prefix = &quot;spring.datasource&quot;)
+        public DataSource datasource(){
+             return DataSourceBuilder.create().type(com.alibaba.druid.pool.DruidDataSource.class).build();
+        }
+}</code></pre>
+                </div>
+                <p>三个bean依次为：Druid监控页面的配置(包含黑白名单)，过滤器的配置，和连接池的yml文件配置读取，加载</p>
+              </section>
+              <section class="article-section" id="yaml">
+                <header class="section-heading">
+                  <span>04</span>
+                  <div><p>YAML CONFIG</p><h2>配置连接池参数</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 03</span><small>YAML</small></div>
+                  <pre><code>spring:
+  datasource:
+    url: jdbc:mysql://10.200.200.6:3306/scauth?useUnicode=true&amp;allowMultiQueries=true&amp;characterEncoding=utf8&amp;noAccessToProcedureBodies=true&amp;zeroDateTimeBehavior=convertToNull
+    password: 
+    username: 
+    driver-class-name: com.mysql.jdbc.Driver
+    platform: mysql
+    # 下面为连接池的补充设置，应用到上面所有数据源中
+    type: com.alibaba.druid.pool.DruidDataSource
+    # 初始化大小，最小，最大
+    initialSize: 1
+    minIdle: 3
+    maxActive: 20
+    # 配置获取连接等待超时的时间
+    maxWait: 60000
+    # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
+    timeBetweenEvictionRunsMillis: 60000
+    # 配置一个连接在池中最小生存的时间，单位是毫秒
+    minEvictableIdleTimeMillis: 30000
+    validationQuery: select &#x27;x&#x27;
+    testWhileIdle: true
+    testOnBorrow: false
+    testOnReturn: false
+    # 打开PSCache，并且指定每个连接上PSCache的大小
+    poolPreparedStatements: true
+    maxPoolPreparedStatementPerConnectionSize: 20
+    # 配置监控统计拦截的filters，去掉后监控界面sql无法统计，&#x27;wall&#x27;用于防火墙
+    filters: stat,wall,slf4j
+    # 通过connectProperties属性来打开mergeSql功能；慢SQL记录
+    connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=5000
+    # 合并多个DruidDataSource的监控数据
+    #useGlobalDataSourceStat: true</code></pre>
+                </div>
+                <p>Druid支持多数据源配置，不过上面的配置方式只是单数据源的，</p>
+              </section>
+              <section class="article-section" id="console">
+                <header class="section-heading">
+                  <span>05</span>
+                  <div><p>MONITOR CONSOLE</p><h2>访问 Druid 监控页面</h2></div>
+                </header>
+                <p>就能看到登录页</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-druid/druid-login.png" alt="Druid 监控控制台登录页" loading="lazy">
+                  <figcaption>Druid 监控控制台登录页</figcaption>
+                </figure>
+                <p>输入账户/密码：admin/admin 登录成功，跳转首页。在此提示，登录账户密码可以不设置，不设置的话访问链接直接跳转首页</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-druid/druid-dashboard.png" alt="Druid 监控控制台首页" loading="lazy">
+                  <figcaption>Druid 监控控制台首页</figcaption>
+                </figure>
+                <p>首页展示的是项目的概要包括驱动，路径， jdk 版本，引用的jar等。除此之外还有各种统计。特别要记住的是，Druid的统计不会持久存储，项目每次重启会清零所以如果有需要保存的数据 最好自己保存一份</p>
+              </section>
+
+              <section class="article-section" id="references">
+                <header class="section-heading"><span>06</span><div><p>MIGRATION &amp; SOURCE</p><h2>迁移说明与原始来源</h2></div></header>
+                <p>本文由本地保存的 CSDN 正文迁移而来，保留原始实践步骤、代码与截图，并对标题层级、段落和版本提示进行了重新整理。</p>
+                <div class="source-note">
+                  <strong>原始文章</strong>
+                  <p>《Spring Boot 配置 Druid》，原发布于 2018-08-01。示例环境与结论应结合文章中的版本背景阅读。</p>
+                  <a href="https://blog.csdn.net/penyoudi1/article/details/81328286" target="_blank" rel="noopener noreferrer">查看 CSDN 原文 ↗</a>
+                </div>
+              </section>
+
+              <div class="article-end" aria-label="文章结束"><span></span><strong>✦</strong><span></span><p>让数据源配置具备监控与排查能力</p></div>
+            </div>
+
+            <aside class="reading-sidebar reading-sidebar--archive">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">ARTICLE CARD</p><h2>工程档案</h2>
+                <div class="progress-orbit progress-orbit--text"><strong>06</strong><small>DATA SOURCE</small></div>
+                <dl class="archive-facts">
+                  <div><dt>领域</dt><dd>Java 与工程</dd></div>
+                  <div><dt>组件</dt><dd>Druid</dd></div>
+                  <div><dt>版本</dt><dd>1.1.10</dd></div>
+                  <div><dt>难度</dt><dd>进阶</dd></div>
+                  <div><dt>状态</dt><dd><span class="status-dot"></span>历史整理</dd></div>
+                </dl>
+                <a class="archive-action" href="../../index.html">浏览更多文章 →</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <nav class="article-pagination" aria-label="文章翻页">
+          <a href="../spring-boot-redis-cluster/index.html"><small>上一篇</small><strong>Spring Boot 整合 Redis 集群</strong></a>
+          <span aria-hidden="true">✦</span>
+          <a href="../mapstruct-guide/index.html"><small>下一篇</small><strong>MapStruct 使用教程与常见问题</strong></a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="fantasy-footer"><div class="footer-copy"><p><span></span> 知识如星辰，记录即永恒。 <span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer>
+  </div>
+</body>
+</html>

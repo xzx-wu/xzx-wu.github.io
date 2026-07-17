@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="系统整理 MapStruct 的基础映射、Spring 集成、自定义类型转换与常见编译问题。">
+  <meta name="keywords" content="MapStruct,Java,Bean 转换,Java 与工程,工具与效率">
+  <meta name="article:realm" content="java-engineering,tools-productivity">
+  <title>MapStruct 使用教程与常见问题 · Arcane Archive</title>
+  <link rel="icon" type="image/png" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-4">
+</head>
+<body>
+  <div class="detail-shell">
+    <div class="frame-lines" aria-hidden="true"></div>
+    <img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="" aria-hidden="true">
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="主导航">
+        <a class="brand" href="../../../index.html">
+          <img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt="" aria-hidden="true">
+          <span>xzx-wu</span><small>Arcane Archive</small>
+        </a>
+        <div class="nav-links">
+          <a href="../../../index.html">首页</a>
+          <a class="is-active" href="../../index.html" aria-current="page">知识卷轴</a>
+          <a href="../../../journeys/index.html">学习旅程</a>
+          <a href="../../../about/index.html">关于</a>
+          <a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon" aria-hidden="true"></span>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero article-hero--engineering">
+          <div class="article-hero__shade" aria-hidden="true"></div>
+          <div class="article-hero__inner">
+            <div class="article-hero__copy">
+              <nav class="breadcrumb" aria-label="面包屑导航"><a href="../../index.html">知识卷轴</a><span aria-hidden="true">✦</span><span>Java 与工程</span></nav>
+              <p class="article-kicker">ENGINEERING · CODE GENERATION</p>
+              <h1>MapStruct 使用教程<br>与常见问题</h1>
+              <p class="article-deck">从基础对象映射、Spring 托管到自定义转换函数，并整理 Lombok 兼容和映射不生效问题。</p>
+              <div class="article-meta" aria-label="文章信息">
+                <time datetime="2024-12-19">2024-12-19</time>
+                <span>Java 与工程</span>
+                <span>工具与效率</span>
+                <span>约 16 分钟阅读</span>
+              </div>
+            </div>
+            <div class="chapter-seal" aria-label="工程档案第 07 篇"><span>ENGINEERING LOG</span><strong>07</strong><small>BEAN MAPPING</small></div>
+          </div>
+        </header>
+
+        <div class="reading-stage">
+          <div class="reading-layout">
+            <aside class="reading-sidebar reading-sidebar--toc">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2>
+                <nav class="article-toc" aria-label="文章目录">
+                  <a href="#overview"><span>01</span>概述</a>
+                  <a href="#features"><span>02</span>MapStruct 的特性</a>
+                  <a href="#basic"><span>03</span>基础使用流程</a>
+                  <a href="#advanced"><span>04</span>高级特性</a>
+                  <a href="#troubleshooting"><span>05</span>常见问题解答</a>
+                  <a href="#references"><span>06</span>迁移说明与来源</a>
+                </nav>
+                <a class="back-link" href="../../index.html">← 返回知识卷轴</a>
+              </div>
+            </aside>
+
+            <div class="article-body">
+              <section class="opening-note"><span class="opening-note__mark" aria-hidden="true">“</span><div><p>把对象转换规则交给编译期代码生成，可以兼顾可读性、类型检查与执行效率。</p><small>工程实践档案 · MapStruct</small></div></section>
+
+              <section class="article-section" id="overview">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><p>OVERVIEW</p><h2>概述</h2></div>
+                </header>
+                <div class="article-callout">
+                  <strong>版本背景</strong>
+                  <p>MapStruct 与 Lombok 都依赖注解处理器。实际项目中应让依赖版本、编译插件和 annotationProcessorPaths 保持一致，并在调整后执行完整的 Maven clean。</p>
+                </div>
+                <p>MapStruct是一个代码生成器，它大大简化了Java bean 类 型之间映射的实现。他生成的映射代码使用纯方法调用，因此快速，类型安全且高效。</p>
+                <p>官网地址：<a href="https://mapstruct.org/" target="_blank" rel="noopener noreferrer">MapStruct – Java bean mappings, the easy way!</a></p>
+              </section>
+              <section class="article-section" id="features">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><p>FEATURES</p><h2>MapStruct 的特性</h2></div>
+                </header>
+                <p>根据官网的描述和介绍，我们可以得出以下结论：</p>
+                <ul class="goal-list">
+                  <li><span aria-hidden="true">✦</span>快速：MapStruct会生成基础的get/set方法，基于纯方法调用，避免了复杂的反射处理，大大提高了工作效率</li>
+                  <li><span aria-hidden="true">✦</span>类型安全：MapStruct在编译期检查映射规则，确保源对象和目标对象的之间的属性映射是类型安全的。如果规则不完整或者规则异常，可以在编译器提前发现问题，避免运行时异常</li>
+                  <li><span aria-hidden="true">✦</span>易于理解/开发：MapStruct的代码简单易懂很容易上手，而且也支持通过各种复杂规则的开发，包括深拷贝和自定义转换函数</li>
+                </ul>
+              </section>
+              <section class="article-section" id="basic">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><p>BASIC USAGE</p><h2>基础使用流程</h2></div>
+                </header>
+                <h3 class="subsection-title">1.引用依赖：首先在 项目 中引入相关依赖（如Maven或Gradle）</h3>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 01</span><small>XML</small></div>
+                  <pre><code>&lt;dependency&gt;
+            &lt;groupId&gt;org.mapstruct&lt;/groupId&gt;
+            &lt;artifactId&gt;mapstruct&lt;/artifactId&gt;
+            &lt;version&gt;1.5.2.Final&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.mapstruct&lt;/groupId&gt;
+            &lt;artifactId&gt;mapstruct-processor&lt;/artifactId&gt;
+            &lt;version&gt;1.5.2.Final&lt;/version&gt;
+            &lt;scope&gt;provided&lt;/scope&gt;
+        &lt;/dependency&gt;</code></pre>
+                </div>
+                <h3 class="subsection-title">2.创建两个对象，用于bean转换</h3>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 02</span><small>JAVA</small></div>
+                  <pre><code>@Data
+public class UserEntity {
+ 
+    private String userName;
+    private String account;
+    private String password;
+ 
+}
+ 
+@Data
+public class UserPo {
+ 
+    private String userName;
+    private String account;
+    private String password;
+ 
+}</code></pre>
+                </div>
+                <h3 class="subsection-title">3.创建一个映射接口：添加注解 @Mapper 声明需要映射的方法。</h3>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 03</span><small>JAVA</small></div>
+                  <pre><code>import org.mapstruct.Mapper;
+import org.mapstruct.factory.Mappers;
+ 
+@Mapper
+public interface UserConverter {
+ 
+    UserConverter INSTANCES = Mappers.getMapper(UserConverter.class);
+ 
+    UserEntity po2Entity(UserPo userPo);
+ 
+    UserPo entity2Po(UserEntity userEntity);
+ 
+    List&lt;UserEntity&gt; po2Entity(List&lt;UserPo&gt; userPo);
+ 
+    List&lt;UserPo&gt; entity2Po(List&lt;UserEntity&gt; userEntity);
+ 
+}</code></pre>
+                </div>
+                <h3 class="subsection-title">4.编译后可以在target下看到生成的代码</h3>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/mapstruct-guide/generated-implementation.png" alt="MapStruct 编译后生成的实现类" loading="lazy">
+                  <figcaption>MapStruct 编译后生成的实现类</figcaption>
+                </figure>
+                <h3 class="subsection-title">5.在业务代码中直接使用即可</h3>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 04</span><small>CODE</small></div>
+                  <pre><code>/**
+     * 创建用户
+     *
+     * @param entity 用户对象
+     * @return 结果
+     */
+    @Override
+    public boolean create(UserEntity entity) {
+        UserPo po = UserConverter.INSTANCES.entity2Po(entity);
+        return userDao.insert(po) &gt; 0;
+    }</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="advanced">
+                <header class="section-heading">
+                  <span>04</span>
+                  <div><p>ADVANCED</p><h2>高级特性</h2></div>
+                </header>
+                <p>上面简单介绍了MapStruct的基础使用流程。下面我们介绍下一些进阶的使用方法</p>
+                <h3 class="subsection-title">1.Spring托管：</h3>
+                <p>上面的方法我们是通过静态方法去调用，那么如何通过spring来管理呢？方法很简单，将上面的接口添加 componentModel = &quot;spring&quot; 即可：</p>
+                <p>接口层：</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 05</span><small>JAVA</small></div>
+                  <pre><code>import org.mapstruct.Mapper;
+ 
+@Mapper(componentModel = &quot;spring&quot;)
+public interface UserConverter {
+ 
+    UserEntity po2Entity(UserPo userPo);
+ 
+    UserPo entity2Po(UserEntity userEntity);
+ 
+    List&lt;UserEntity&gt; po2Entity(List&lt;UserPo&gt; userPo);
+ 
+    List&lt;UserPo&gt; entity2Po(List&lt;UserEntity&gt; userEntity);
+ 
+}</code></pre>
+                </div>
+                <p>业务层</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 06</span><small>CODE</small></div>
+                  <pre><code>@Resource
+    private UserConverter converter;
+ 
+    /**
+     * 创建用户
+     *
+     * @param entity 用户对象
+     * @return 结果
+     */
+    @Override
+    public boolean create(UserEntity entity) {
+        UserPo po = converter.entity2Po(entity);
+        return userDao.insert(po) &gt; 0;
+    }</code></pre>
+                </div>
+                <h3 class="subsection-title">2.复杂函数转换：</h3>
+                <p>有时候我们可能遇到特殊的场景，比方说一个字符串转为list，或者字段名不同等场景，这个时候就要用到MapStruct的函数功能</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 07</span><small>JAVA</small></div>
+                  <pre><code>//示例对象
+@Data
+public class UserEntity {
+ 
+    private String userName;
+    private String account;
+    private String password;
+    private List&lt;String&gt; email;
+ 
+}
+ 
+@Data
+public class UserPo {
+ 
+    private String userName;
+    private String account;
+    private String password;
+    private String email;
+ 
+}</code></pre>
+                </div>
+                <p>上面这两个对象中，email字段一个是list一个是string，正常编译肯定报类型转换异常</p>
+                <div class="article-callout article-callout--muted"><strong>编译信息</strong><p>/Users/workSpace/java/quan-app/src/main/java/com/quan/app/quanapp/infrastructure/auth/db/mapping/UserConverter.java:20:16 java: Can&#x27;t map property &quot;java.lang.String email&quot; to &quot;java.util.List&lt;java.lang.String&gt; email&quot;. Consider to declare/implement a mapping method: &quot;java.util.List&lt;java.lang.String&gt; map(java.lang.String value)&quot;.</p></div>
+                <p>第一步：新建一个类型转换类，注意要使用MapStruct的@Named注解对方法进行标注</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 08</span><small>JAVA</small></div>
+                  <pre><code>import org.mapstruct.Named;
+import java.util.Arrays;
+import java.util.List;
+ 
+public class StructHelper {
+    /**
+     * 将字符串转换为字符串数组
+     */
+    @Named(&quot;mapStringToArray&quot;)
+    public List&lt;String&gt; mapStringToArray(String str) {
+        if (str == null) {
+            return null;
+        }
+        // 将字符串分割并转换为 List
+        return Arrays.asList(str.split(&quot;,&quot;));
+    }
+ 
+    /**
+     * 将字符串转换为字符串数组
+     */
+    @Named(&quot;mapArrayToString&quot;)
+    public String mapArrayToString(List&lt;String&gt; array) {
+        if (array == null || array.isEmpty()) {
+            return null;
+        }
+        return String.join(&quot;,&quot;, array); // 根据逗号分隔的字符串转换为数组
+    }
+}</code></pre>
+                </div>
+                <p>第二步：在接口类的注释上增加类的引用 uses = StructHelper.class ，具体的接口增加：@Mapping 注解</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 09</span><small>JAVA</small></div>
+                  <pre><code>import com.quan.app.quanapp.application.entity.UserEntity;
+import com.quan.app.quanapp.infrastructure.auth.db.po.UserPo;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+ 
+import java.util.List;
+ 
+ 
+@Mapper(componentModel = &quot;spring&quot;, uses = StructHelper.class)
+public interface UserConverter {
+ 
+    @Mapping(source = &quot;email&quot;, target = &quot;email&quot;, qualifiedByName = &quot;mapStringToArray&quot;)
+    UserEntity po2Entity(UserPo userPo);
+ 
+    @Mapping(source = &quot;email&quot;, target = &quot;email&quot;, qualifiedByName = &quot;mapArrayToString&quot;)
+    UserPo entity2Po(UserEntity userEntity);
+ 
+    List&lt;UserEntity&gt; po2Entity(List&lt;UserPo&gt; userPo);
+ 
+    List&lt;UserPo&gt; entity2Po(List&lt;UserEntity&gt; userEntity);
+ 
+}</code></pre>
+                </div>
+                <p>第三步：重新编译代码。可以看到生成的代码调用了类型转换方法。</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/mapstruct-guide/generated-custom-conversion.png" alt="生成代码调用自定义类型转换方法" loading="lazy">
+                  <figcaption>生成代码调用自定义类型转换方法</figcaption>
+                </figure>
+                <p>补充说明1：如果你的有定义对象的类型转换，那么list集合转换的时候不需要再重复使用@Mapping 注解，因为MapStruct会复用已有方法而不会重新生成copy代码</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/mapstruct-guide/generated-default-method.png" alt="生成代码调用接口 default 方法" loading="lazy">
+                  <figcaption>生成代码调用接口 default 方法</figcaption>
+                </figure>
+                <p>补充说明2:如果你不想创建类型转换类觉得太繁琐，也可以在接口中定义：default方法，具体如下</p>
+                <div class="code-block code-block--large">
+                  <div class="code-block__label"><span>示例 10</span><small>JAVA</small></div>
+                  <pre><code>import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.Named;
+ 
+@Mapper(componentModel = &quot;spring&quot;)
+public interface UserConverter {
+ 
+    @Mapping(source = &quot;email&quot;, target = &quot;email&quot;, qualifiedByName = &quot;mapStringToArray&quot;)
+    UserEntity po2Entity(UserPo userPo);
+ 
+    @Mapping(source = &quot;email&quot;, target = &quot;email&quot;, qualifiedByName = &quot;mapArrayToString&quot;)
+    UserPo entity2Po(UserEntity userEntity);
+ 
+    List&lt;UserEntity&gt; po2Entity(List&lt;UserPo&gt; userPo);
+ 
+    List&lt;UserPo&gt; entity2Po(List&lt;UserEntity&gt; userEntity);
+ 
+    /**
+     * 将字符串转换为字符串数组
+     */
+    @Named(&quot;mapStringToArray&quot;)
+    default List&lt;String&gt; mapStringToArray(String str) {
+        if (str == null) {
+            return null;
+        }
+        // 将字符串分割并转换为 List
+        return Arrays.asList(str.split(&quot;,&quot;));
+    }
+ 
+    /**
+     * 将字符串转换为字符串数组
+     */
+    @Named(&quot;mapArrayToString&quot;)
+    default String mapArrayToString(List&lt;String&gt; array) {
+        if (array == null || array.isEmpty()) {
+            return null;
+        }
+        return String.join(&quot;,&quot;, array); // 根据逗号分隔的字符串转换为数组
+    }
+ 
+}</code></pre>
+                </div>
+                <p>生成的代码直接调用接口方法</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/mapstruct-guide/mapping-field-workaround.png" alt="通过不同字段名明确 source 与 target 映射" loading="lazy">
+                  <figcaption>通过不同字段名明确 source 与 target 映射</figcaption>
+                </figure>
+              </section>
+              <section class="article-section" id="troubleshooting">
+                <header class="section-heading">
+                  <span>05</span>
+                  <div><p>TROUBLESHOOTING</p><h2>常见问题解答</h2></div>
+                </header>
+                <h3 class="subsection-title">1.MapStruct 和 lombok的版本兼容性问题：</h3>
+                <p>上面我们说过，MapStruct是基于原始get/set方法来生成代码进行bean拷贝，所以当MapStruct 和 lombok同时使用时会遇到兼容性问题（Lombok 1.18.12版本以下不影响，1.18.16 版本以上会受影响），在启动的时候报以下错误</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 11</span><small>TEXT</small></div>
+                  <pre><code>***************************
+APPLICATION FAILED TO START
+***************************
+ 
+Description:
+ 
+A component required a bean of type &#x27;com.quan.app.quanapp.infrastructure.auth.db.mapping.UserConverter&#x27; that could not be found.
+ 
+ 
+Action:
+ 
+Consider defining a bean of type &#x27;com.quan.app.quanapp.infrastructure.auth.db.mapping.UserConverter&#x27; in your configuration.</code></pre>
+                </div>
+                <p>解决方案：在pom中新增以下配置&lt;annotationProcessorPaths&gt;，然后重新mvn clean ，mvn install。一定要重新用mvn编译，避免缓存问题</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 12</span><small>XML</small></div>
+                  <pre><code>&lt;build&gt;
+        &lt;plugins&gt;
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+                &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+                &lt;version&gt;3.8.1&lt;/version&gt;
+                &lt;configuration&gt;
+                    &lt;source&gt;1.8&lt;/source&gt;
+                    &lt;target&gt;1.8&lt;/target&gt;
+                    &lt;annotationProcessorPaths&gt;
+                        &lt;path&gt;
+                            &lt;groupId&gt;org.mapstruct&lt;/groupId&gt;
+                            &lt;artifactId&gt;mapstruct-processor&lt;/artifactId&gt;
+                            &lt;version&gt;${org.mapstruct.version}&lt;/version&gt;
+                        &lt;/path&gt;
+                        &lt;path&gt;
+                            &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+                            &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+                            &lt;version&gt;1.18.16&lt;/version&gt;
+                        &lt;/path&gt;
+                        &lt;!-- This is needed when using Lombok 1.18.16 and above --&gt;
+                        &lt;path&gt;
+                            &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+                            &lt;artifactId&gt;lombok-mapstruct-binding&lt;/artifactId&gt;
+                            &lt;version&gt;0.2.0&lt;/version&gt;
+                        &lt;/path&gt;
+                    &lt;/annotationProcessorPaths&gt;
+                &lt;/configuration&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/build&gt;</code></pre>
+                </div>
+                <h3 class="subsection-title">2.定义mapping后不生效的问题：</h3>
+                <p>之前遇到一个奇怪的问题,两个要映射的对象，字段名相同，字段类型不同，对象转换过程中明明定义了mapping，引用了 qualifiedByName = &quot;mapStringToArray&quot; 方法。</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 13</span><small>JAVA</small></div>
+                  <pre><code>@Getter
+@Setter
+public class A {
+    private List&lt;String&gt; orderSource;
+}
+ 
+@Getter
+@Setter
+public class B {
+    private String orderSource;
+}
+ 
+//具体方法
+@Mapping(source = &quot;orderSource&quot;, target = &quot;orderSource&quot;, qualifiedByName = &quot;mapStringToArray&quot;)
+A poToRes(B one);</code></pre>
+                </div>
+                <p>但是编译过程中还是报以下错误，指明类型转换异常，这种情况暂未找到根本问题，怀疑是底层代码生成时优先级的问题，只能通过其他方法规避下</p>
+                <div class="article-callout article-callout--muted"><strong>编译信息</strong><p>Can&#x27;t map property &quot;String B.orderSource&quot; to &quot;List&lt;String&gt; A.orderSource&quot;. Consider to declare/implement a mapping method: &quot;List&lt;String&gt; map(String value)&quot;.</p></div>
+                <p>解决方案：将两个同名字段名修改下，采用不同的字段名，然后通过source 和 target做映射。然后问题解决，代码正确生成。</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 14</span><small>JAVA</small></div>
+                  <pre><code>@Getter
+@Setter
+public class A {
+    private List&lt;String&gt; orderSourcs;
+}
+ 
+@Getter
+@Setter
+public class B {
+    private String orderSource;
+}
+ 
+//具体方法
+@Mapping(source = &quot;orderSource&quot;, target = &quot;orderSources&quot;, qualifiedByName = &quot;mapStringToArray&quot;)
+A poToRes(B one);</code></pre>
+                </div>
+                <h3 class="subsection-title">3.其他注意到问题：</h3>
+                <p>接口上的mappr 的路径为：org.mapstruct.Mapper ，不是mybatis的 org. apache .ibatis.annotations.Mapper</p>
+              </section>
+
+              <section class="article-section" id="references">
+                <header class="section-heading"><span>06</span><div><p>MIGRATION &amp; SOURCE</p><h2>迁移说明与原始来源</h2></div></header>
+                <p>本文由本地保存的 CSDN 正文迁移而来，保留原始实践步骤、代码与截图，并对标题层级、段落和版本提示进行了重新整理。</p>
+                <div class="source-note">
+                  <strong>原始文章</strong>
+                  <p>《MapStruct 使用教程与常见问题》，原发布于 2024-12-19。示例环境与结论应结合文章中的版本背景阅读。</p>
+                  <a href="https://blog.csdn.net/penyoudi1/article/details/144594098" target="_blank" rel="noopener noreferrer">查看 CSDN 原文 ↗</a>
+                </div>
+              </section>
+
+              <div class="article-end" aria-label="文章结束"><span></span><strong>✦</strong><span></span><p>让对象转换规则在编译期变得清晰可见</p></div>
+            </div>
+
+            <aside class="reading-sidebar reading-sidebar--archive">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">ARTICLE CARD</p><h2>工程档案</h2>
+                <div class="progress-orbit progress-orbit--text"><strong>07</strong><small>BEAN MAPPING</small></div>
+                <dl class="archive-facts">
+                  <div><dt>领域</dt><dd>Java 与工程</dd></div>
+                  <div><dt>关联</dt><dd>工具与效率</dd></div>
+                  <div><dt>方式</dt><dd>编译期生成</dd></div>
+                  <div><dt>难度</dt><dd>进阶</dd></div>
+                  <div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div>
+                </dl>
+                <a class="archive-action" href="../../index.html">浏览更多文章 →</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <nav class="article-pagination" aria-label="文章翻页">
+          <a href="../spring-boot-druid/index.html"><small>上一篇</small><strong>Spring Boot 配置 Druid</strong></a>
+          <span aria-hidden="true">✦</span>
+          <a href="../../index.html"><small>下一篇</small><strong>知识卷轴</strong></a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="fantasy-footer"><div class="footer-copy"><p><span></span> 知识如星辰，记录即永恒。 <span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer>
+  </div>
+</body>
+</html>

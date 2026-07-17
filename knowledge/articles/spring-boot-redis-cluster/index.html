@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="记录 Spring Boot 1.5.10 使用 JedisCluster 连接 Redis 集群的配置与基础工具类。">
+  <meta name="keywords" content="Spring Boot,Redis,JedisCluster,Java 与工程">
+  <meta name="article:realm" content="java-engineering">
+  <title>Spring Boot 整合 Redis 集群 · Arcane Archive</title>
+  <link rel="icon" type="image/png" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-4">
+</head>
+<body>
+  <div class="detail-shell">
+    <div class="frame-lines" aria-hidden="true"></div>
+    <img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="" aria-hidden="true">
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="主导航">
+        <a class="brand" href="../../../index.html">
+          <img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt="" aria-hidden="true">
+          <span>xzx-wu</span><small>Arcane Archive</small>
+        </a>
+        <div class="nav-links">
+          <a href="../../../index.html">首页</a>
+          <a class="is-active" href="../../index.html" aria-current="page">知识卷轴</a>
+          <a href="../../../journeys/index.html">学习旅程</a>
+          <a href="../../../about/index.html">关于</a>
+          <a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon" aria-hidden="true"></span>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero article-hero--engineering">
+          <div class="article-hero__shade" aria-hidden="true"></div>
+          <div class="article-hero__inner">
+            <div class="article-hero__copy">
+              <nav class="breadcrumb" aria-label="面包屑导航"><a href="../../index.html">知识卷轴</a><span aria-hidden="true">✦</span><span>Java 与工程</span></nav>
+              <p class="article-kicker">ENGINEERING · CACHE CLUSTER</p>
+              <h1>Spring Boot 整合<br>Redis 集群</h1>
+              <p class="article-deck">基于 Spring Boot 1.5.10 和 JedisCluster，整理集群连接、连接池参数与工具类封装。</p>
+              <div class="article-meta" aria-label="文章信息">
+                <time datetime="2018-07-31">2018-07-31</time>
+                <span>Java 与工程</span>
+                <span>约 14 分钟阅读</span>
+              </div>
+            </div>
+            <div class="chapter-seal" aria-label="工程档案第 05 篇"><span>ENGINEERING LOG</span><strong>05</strong><small>REDIS CLUSTER</small></div>
+          </div>
+        </header>
+
+        <div class="reading-stage">
+          <div class="reading-layout">
+            <aside class="reading-sidebar reading-sidebar--toc">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2>
+                <nav class="article-toc" aria-label="文章目录">
+                  <a href="#background"><span>01</span>项目背景与版本范围</a>
+                  <a href="#dependency"><span>02</span>引入 Redis Starter</a>
+                  <a href="#cluster-config"><span>03</span>创建 JedisCluster</a>
+                  <a href="#yaml"><span>04</span>配置集群节点和连接池</a>
+                  <a href="#utility"><span>05</span>封装 Redis 工具类</a>
+                  <a href="#references"><span>06</span>迁移说明与来源</a>
+                </nav>
+                <a class="back-link" href="../../index.html">← 返回知识卷轴</a>
+              </div>
+            </aside>
+
+            <div class="article-body">
+              <section class="opening-note"><span class="opening-note__mark" aria-hidden="true">“</span><div><p>集群接入的关键不只是节点列表，还包括超时、重试、连接池与序列化边界。</p><small>历史工程档案 · Spring Boot 1.5.10</small></div></section>
+
+              <section class="article-section" id="background">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><p>VERSION CONTEXT</p><h2>项目背景与版本范围</h2></div>
+                </header>
+                <div class="article-callout">
+                  <strong>版本背景</strong>
+                  <p>原文明确基于 JDK 8、Spring Boot 1.5.10 与当时的 JedisCluster API，不适用于直接照搬到 Spring Boot 2.x 或更高版本。</p>
+                </div>
+                <p>我负责的项目中用到了redis，因为是单人负责整个项目，所以只能去网上找相关的资料和文档，现在项目上线，将相关配置记录下，方便自己以后查阅，也希望能给其他同学带来参考和帮助。</p>
+                <p>springBoot2.0以后版本做了重大更新，本博客基于的是1.5.10版本，不适用于2.0以上的版本，所以请大家注意下。jdk版本是1.8，redis集群是公司运维的同学搭建的，所以在此不讨论redis集群的版本号和配置问题。</p>
+              </section>
+              <section class="article-section" id="dependency">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><p>DEPENDENCY</p><h2>引入 Redis Starter</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 01</span><small>XML</small></div>
+                  <pre><code>&lt;dependency&gt;
+			&lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+			&lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+                        &lt;version&gt;1.5.10.RELEASE&lt;/version&gt;
+		&lt;/dependency&gt;</code></pre>
+                </div>
+                <p>version版本号可以自定义，也可以根据你的springBoot版本走，这里是为了给大家看的清楚，写死了版本号</p>
+              </section>
+              <section class="article-section" id="cluster-config">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><p>JEDIS CLUSTER</p><h2>创建 JedisCluster</h2></div>
+                </header>
+                <div class="code-block code-block--large">
+                  <div class="code-block__label"><span>示例 02</span><small>JAVA</small></div>
+                  <pre><code>import java.util.HashSet;
+import java.util.Set;
+ 
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import redis.clients.jedis.HostAndPort;
+import redis.clients.jedis.JedisCluster;
+ 
+/**
+ * ClassName: JedisClusterConfig 
+ * Description: 
+ * @date 2018年4月3日  
+ */
+@Configuration
+public class JedisClusterConfig {
+	
+	private static final Logger log = LoggerFactory.getLogger(JedisClusterConfig.class);
+ 
+	@Value(&quot;${redis.nodes}&quot;)
+	private String nodes;
+ 
+	@Value(&quot;${redis.commandTimeout}&quot;)
+	private int commandTimeout;
+	
+	@Value(&quot;${redis.pwd}&quot;)
+	private String pwd;
+	
+	@Value(&quot;${redis.maxTotal}&quot;)
+	private int maxTotal;
+	
+	@Value(&quot;${redis.maxIdle}&quot;)
+	private int maxIdle;
+	
+	@Value(&quot;${redis.minIdle}&quot;)
+	private int minIdle;
+	
+	@Value(&quot;${redis.maxWait}&quot;)
+	private int maxWait;
+	
+    /**
+     * 注意：
+     * 这里返回的JedisCluster是单例的，并且可以直接注入到其他类中去使用
+     * @return
+     */
+    @Bean
+    public JedisCluster getJedisCluster() {
+    	 log.info(&quot;进入redis集群初始化方法：访问集群地址为：&quot;+nodes);
+        String[] serverArray = nodes.split(&quot;,&quot;);//获取服务器数组(这里要相信自己的输入，所以没有考虑空指针问题)
+        Set&lt;HostAndPort&gt; nodes = new HashSet&lt;&gt;();
+        for (String ipPort : serverArray) {
+            String[] ipPortPair = ipPort.split(&quot;:&quot;);
+            nodes.add(new HostAndPort(ipPortPair[0].trim(), Integer.valueOf(ipPortPair[1].trim())));
+        }
+        GenericObjectPoolConfig config = new GenericObjectPoolConfig();
+        config.setMaxTotal(maxTotal);
+        config.setMaxIdle(maxIdle);
+        config.setMinIdle(minIdle);//设置最小空闲数
+        config.setMaxWaitMillis(maxWait);
+	//在获取Jedis连接时，自动检验连接是否可用
+	config.setTestOnBorrow(true);
+	//在将连接放回池中前，自动检验连接是否有效
+	config.setTestOnReturn(true);
+	//自动测试池中的空闲连接是否都是可用连接
+	config.setTestWhileIdle(true);
+	//连接耗尽时是否阻塞, false报异常,ture阻塞直到超时,默认true
+	config.setBlockWhenExhausted(false);
+        //表示idle object evitor两次扫描之间要sleep的毫秒数
+        config.setTimeBetweenEvictionRunsMillis(30000);
+        //表示idle object evitor每次扫描的最多的对象数
+        config.setNumTestsPerEvictionRun(10);
+        //表示一个对象至少停留在idle状态的最短时间，然后才能被idle object evitor扫描并驱逐；这一项只有在timeBetweenEvictionRunsMillis大于0时才有意义
+        config.setMinEvictableIdleTimeMillis(60000);
+        //需要密码连接的创建对象方式
+        //参数依次是：集群地址，链接超时时间，返回值的超时时间，链接尝试次数，密码和配置文件
+        return new JedisCluster(nodes,commandTimeout,10000,3,pwd,config);
+    }
+    
+}</code></pre>
+                </div>
+                <p>这里提供的是最全的JedisCluster实例化方法，所有的参数都传入，如果你并不需要传入这么多参数，JedisCluster还提供了其他方法，包括集群的和单点的都有，可以根据需求自己配置：</p>
+                <div class="code-block code-block--large">
+                  <div class="code-block__label"><span>示例 03</span><small>CODE</small></div>
+                  <pre><code>public JedisCluster(HostAndPort node) {
+	this(Collections.singleton(node), DEFAULT_TIMEOUT);
+  }
+ 
+  public JedisCluster(HostAndPort node, int timeout) {
+    this(Collections.singleton(node), timeout, DEFAULT_MAX_REDIRECTIONS);
+  }
+ 
+  public JedisCluster(HostAndPort node, int timeout, int maxAttempts) {
+    this(Collections.singleton(node), timeout, maxAttempts, new GenericObjectPoolConfig());
+  }
+ 
+  public JedisCluster(HostAndPort node, final GenericObjectPoolConfig poolConfig) {
+    this(Collections.singleton(node), DEFAULT_TIMEOUT, DEFAULT_MAX_REDIRECTIONS, poolConfig);
+  }
+ 
+  public JedisCluster(HostAndPort node, int timeout, final GenericObjectPoolConfig poolConfig) {
+    this(Collections.singleton(node), timeout, DEFAULT_MAX_REDIRECTIONS, poolConfig);
+  }
+ 
+  public JedisCluster(HostAndPort node, int timeout, int maxAttempts,
+      final GenericObjectPoolConfig poolConfig) {
+    this(Collections.singleton(node), timeout, maxAttempts, poolConfig);
+  }
+ 
+  public JedisCluster(HostAndPort node, int connectionTimeout, int soTimeout,
+      int maxAttempts, final GenericObjectPoolConfig poolConfig) {
+    super(Collections.singleton(node), connectionTimeout, soTimeout, maxAttempts, poolConfig);
+  }
+ 
+  public JedisCluster(HostAndPort node, int connectionTimeout, int soTimeout,
+                      int maxAttempts, String password, final GenericObjectPoolConfig poolConfig) {
+    super(Collections.singleton(node), connectionTimeout, soTimeout, maxAttempts, password, poolConfig);
+  }
+  
+  public JedisCluster(Set&lt;HostAndPort&gt; nodes) {
+    this(nodes, DEFAULT_TIMEOUT);
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; nodes, int timeout) {
+    this(nodes, timeout, DEFAULT_MAX_REDIRECTIONS);
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; nodes, int timeout, int maxAttempts) {
+    this(nodes, timeout, maxAttempts, new GenericObjectPoolConfig());
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; nodes, final GenericObjectPoolConfig poolConfig) {
+    this(nodes, DEFAULT_TIMEOUT, DEFAULT_MAX_REDIRECTIONS, poolConfig);
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; nodes, int timeout, final GenericObjectPoolConfig poolConfig) {
+    this(nodes, timeout, DEFAULT_MAX_REDIRECTIONS, poolConfig);
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; jedisClusterNode, int timeout, int maxAttempts,
+      final GenericObjectPoolConfig poolConfig) {
+    super(jedisClusterNode, timeout, maxAttempts, poolConfig);
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; jedisClusterNode, int connectionTimeout, int soTimeout,
+      int maxAttempts, final GenericObjectPoolConfig poolConfig) {
+    super(jedisClusterNode, connectionTimeout, soTimeout, maxAttempts, poolConfig);
+  }
+ 
+  public JedisCluster(Set&lt;HostAndPort&gt; jedisClusterNode, int connectionTimeout, int soTimeout,
+                      int maxAttempts, String password, final GenericObjectPoolConfig poolConfig) {
+    super(jedisClusterNode, connectionTimeout, soTimeout, maxAttempts, password, poolConfig);
+  }</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="yaml">
+                <header class="section-heading">
+                  <span>04</span>
+                  <div><p>YAML PROPERTIES</p><h2>配置集群节点和连接池</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 04</span><small>YAML</small></div>
+                  <pre><code>redis:
+  nodes: 10.200.200.2:7011,10.200.200.2:7012,10.200.200.2:7013,10.200.200.2:7014,10.200.200.2:7015,10.200.200.2:7016
+  commandTimeout: 10000  #redis操作的超时时间
+  maxTotal: 5000 #最大连接数
+  maxIdle: 30 #最大空闲连接数
+  minIdle: 5 #最小空闲连接数
+  maxWait: 3000  #获取连接最大等待时间 ms  #default -1
+  pwd:</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="utility">
+                <header class="section-heading">
+                  <span>05</span>
+                  <div><p>UTILITY</p><h2>封装 Redis 工具类</h2></div>
+                </header>
+                <div class="code-block code-block--large">
+                  <div class="code-block__label"><span>示例 05</span><small>JAVA</small></div>
+                  <pre><code>/**
+ * ClassName: RedisUtil 
+ * Description: 
+ * @date 2018年4月3日  
+ */
+import com.alibaba.fastjson.JSON;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+ 
+import redis.clients.jedis.JedisCluster;
+ 
+@Component
+public class RedisUtil {
+    private static final Logger LOGGER    = LoggerFactory.getLogger(RedisUtil.class);
+ 
+    @Autowired
+    private JedisCluster  jedisCluster;
+ 
+    /**
+     * 设置缓存
+     * @param key    缓存key
+     * @param value  缓存value
+     */
+    public void set(String key, String value) {
+        jedisCluster.set(key, value);
+        LOGGER.debug(&quot;RedisUtil:set cache key={},value={}&quot;, key, value);
+    }
+ 
+    /**
+     * 设置缓存对象
+     * @param key    缓存key
+     * @param obj  缓存value
+     */
+    public &lt;T&gt; void setObject(String key, T obj , int expireTime) {
+        jedisCluster.setex(key, expireTime, JSON.toJSONString(obj));
+    }
+ 
+    /**
+     * 获取指定key的缓存
+     * @param key---JSON.parseObject(value, User.class);
+     */
+    public String getObject(String key) {
+        return jedisCluster.get(key);
+    }
+ 
+    /**
+     * 判断当前key值 是否存在
+     *
+     * @param key
+     */
+    public boolean hasKey(String key) {
+        return jedisCluster.exists(key);
+    }
+ 
+ 
+    /**
+     * 设置缓存，并且自己指定过期时间
+     * @param key
+     * @param value
+     * @param expireTime 过期时间
+     */
+    public void setWithExpireTime( String key, String value, int expireTime) {
+        jedisCluster.setex(key, expireTime, value);
+        LOGGER.debug(&quot;RedisUtil:setWithExpireTime cache key={},value={},expireTime={}&quot;, key, value, expireTime);
+    }
+ 
+ 
+    /**
+     * 获取指定key的缓存
+     * @param key
+     */
+    public String get(String key) {
+        String value = jedisCluster.get(key);
+        LOGGER.debug(&quot;RedisUtil:get cache key={},value={}&quot;,key, value);
+        return value;
+    }
+ 
+    /**
+     * 删除指定key的缓存
+     * @param key
+     */
+    public void delete(String from,String key) {
+        jedisCluster.del(key);
+        LOGGER.info(&quot;RedisUtil:delete &quot;+from+&quot; cache key={}&quot;, key);
+    }
+    
+    /**
+     * @Title: expire  
+     * @Description: 更新key的失效时间 
+     * @param key
+     * @throws
+     */
+    public Long expire(String key,int seconds) {
+    	LOGGER.debug(&quot;RedisUtil:expire cache key={}&quot;, key);
+      return jedisCluster.expire(key, seconds);
+    }
+    
+    public Long pexpire(String key,long seconds) {
+    	LOGGER.debug(&quot;RedisUtil:expire cache key={}&quot;, key);
+      return jedisCluster.pexpire(key, seconds);
+    }
+ 
+}</code></pre>
+                </div>
+                <p>这个工具 类 没有过多封装只是打印了log，实际使用中可以根据情况直接注入JedisCluster对象，也可以将各种判断，序列化引入，封装的更完善。上述写法亲测有效，如果在使用中发现其他问题，可以留言，大家一起探讨。</p>
+              </section>
+
+              <section class="article-section" id="references">
+                <header class="section-heading"><span>06</span><div><p>MIGRATION &amp; SOURCE</p><h2>迁移说明与原始来源</h2></div></header>
+                <p>本文由本地保存的 CSDN 正文迁移而来，保留原始实践步骤、代码与截图，并对标题层级、段落和版本提示进行了重新整理。</p>
+                <div class="source-note">
+                  <strong>原始文章</strong>
+                  <p>《Spring Boot 整合 Redis 集群》，原发布于 2018-07-31。示例环境与结论应结合文章中的版本背景阅读。</p>
+                  <a href="https://blog.csdn.net/penyoudi1/article/details/81300277" target="_blank" rel="noopener noreferrer">查看 CSDN 原文 ↗</a>
+                </div>
+              </section>
+
+              <div class="article-end" aria-label="文章结束"><span></span><strong>✦</strong><span></span><p>把连接配置、使用方式与版本边界一起记录</p></div>
+            </div>
+
+            <aside class="reading-sidebar reading-sidebar--archive">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">ARTICLE CARD</p><h2>工程档案</h2>
+                <div class="progress-orbit progress-orbit--text"><strong>05</strong><small>REDIS CLUSTER</small></div>
+                <dl class="archive-facts">
+                  <div><dt>领域</dt><dd>Java 与工程</dd></div>
+                  <div><dt>组件</dt><dd>Redis Cluster</dd></div>
+                  <div><dt>客户端</dt><dd>Jedis</dd></div>
+                  <div><dt>难度</dt><dd>进阶</dd></div>
+                  <div><dt>状态</dt><dd><span class="status-dot"></span>历史整理</dd></div>
+                </dl>
+                <a class="archive-action" href="../../index.html">浏览更多文章 →</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <nav class="article-pagination" aria-label="文章翻页">
+          <a href="../spring-boot-dubbo-zookeeper/index.html"><small>上一篇</small><strong>Spring Boot 注解整合 Dubbo 与 ZooKeeper</strong></a>
+          <span aria-hidden="true">✦</span>
+          <a href="../spring-boot-druid/index.html"><small>下一篇</small><strong>Spring Boot 配置 Druid</strong></a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="fantasy-footer"><div class="footer-copy"><p><span></span> 知识如星辰，记录即永恒。 <span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer>
+  </div>
+</body>
+</html>

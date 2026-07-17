@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="使用早期 Dubbo Spring Boot Starter、YAML 与注解完成接口、服务提供者和消费者配置。">
+  <meta name="keywords" content="Spring Boot,Dubbo,ZooKeeper,Java 与工程">
+  <meta name="article:realm" content="java-engineering">
+  <title>Spring Boot 注解整合 Dubbo 与 ZooKeeper · Arcane Archive</title>
+  <link rel="icon" type="image/png" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-4">
+</head>
+<body>
+  <div class="detail-shell">
+    <div class="frame-lines" aria-hidden="true"></div>
+    <img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="" aria-hidden="true">
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="主导航">
+        <a class="brand" href="../../../index.html">
+          <img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt="" aria-hidden="true">
+          <span>xzx-wu</span><small>Arcane Archive</small>
+        </a>
+        <div class="nav-links">
+          <a href="../../../index.html">首页</a>
+          <a class="is-active" href="../../index.html" aria-current="page">知识卷轴</a>
+          <a href="../../../journeys/index.html">学习旅程</a>
+          <a href="../../../about/index.html">关于</a>
+          <a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon" aria-hidden="true"></span>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero article-hero--engineering">
+          <div class="article-hero__shade" aria-hidden="true"></div>
+          <div class="article-hero__inner">
+            <div class="article-hero__copy">
+              <nav class="breadcrumb" aria-label="面包屑导航"><a href="../../index.html">知识卷轴</a><span aria-hidden="true">✦</span><span>Java 与工程</span></nav>
+              <p class="article-kicker">ENGINEERING · DISTRIBUTED SERVICE</p>
+              <h1>Spring Boot 注解整合<br>Dubbo 与 ZooKeeper</h1>
+              <p class="article-deck">基于 YAML 和注解组织服务接口、提供者与消费者，完成一套不依赖 XML 的 RPC 示例。</p>
+              <div class="article-meta" aria-label="文章信息">
+                <time datetime="2018-04-13">2018-04-13</time>
+                <span>Java 与工程</span>
+                <span>约 12 分钟阅读</span>
+              </div>
+            </div>
+            <div class="chapter-seal" aria-label="工程档案第 04 篇"><span>ENGINEERING LOG</span><strong>04</strong><small>RPC SERVICE</small></div>
+          </div>
+        </header>
+
+        <div class="reading-stage">
+          <div class="reading-layout">
+            <aside class="reading-sidebar reading-sidebar--toc">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2>
+                <nav class="article-toc" aria-label="文章目录">
+                  <a href="#architecture"><span>01</span>项目拆分与整体流程</a>
+                  <a href="#dependency"><span>02</span>引入 Starter 与接口依赖</a>
+                  <a href="#yaml"><span>03</span>提供者与消费者配置</a>
+                  <a href="#provider"><span>04</span>定义接口与服务提供者</a>
+                  <a href="#consumer"><span>05</span>配置服务消费者</a>
+                  <a href="#verification"><span>06</span>启动顺序与调用验证</a>
+                  <a href="#references"><span>07</span>迁移说明与来源</a>
+                </nav>
+                <a class="back-link" href="../../index.html">← 返回知识卷轴</a>
+              </div>
+            </aside>
+
+            <div class="article-body">
+              <section class="opening-note"><span class="opening-note__mark" aria-hidden="true">“</span><div><p>把接口契约、服务实现和调用方拆开，是理解 RPC 工程结构的第一步。</p><small>历史工程档案 · Dubbo 2.x</small></div></section>
+
+              <section class="article-section" id="architecture">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><p>PROJECT STRUCTURE</p><h2>项目拆分与整体流程</h2></div>
+                </header>
+                <div class="article-callout">
+                  <strong>版本背景</strong>
+                  <p>原文使用 2018 年的 com.alibaba Dubbo Starter 与相关包名。后续 Apache Dubbo 的依赖、注解和配置项可能不同，迁移时需要按项目版本核对。</p>
+                </div>
+                <p>因项目需要，搭建了一个新的springBoot项目，开发过程中，原定的基于 http 提供给其他项目的接口，必须使用dubbo服务提供rpc接口，无奈之下只能去网上找demo，发现现在使用最多的是通过配置xml和bean来整合，没有通过简单的注解和yml的配置来实现的，寻找之下，发现已经有dubbo- spring-boot -starter的jar，而且是2.0版本的，去官网查看api后整理出一个demo，希望为后来的同学提供帮助。官网地址：<a href="https://github.com/alibaba/dubbo-spring-boot-starter/" target="_blank" rel="noopener noreferrer">https://github.com/alibaba/dubbo-spring-boot-starter/</a></p>
+                <p>下面来说流程：</p>
+                <p>首先创建5个项目，两个项目是接口，两个项目是接口的实现及服务提供者，最后一个是测试用的服务使用者</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-dubbo-zookeeper/project-modules.png" alt="示例项目模块结构" loading="lazy">
+                  <figcaption>示例项目模块结构</figcaption>
+                </figure>
+              </section>
+              <section class="article-section" id="dependency">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><p>DEPENDENCY</p><h2>引入 Starter 与接口依赖</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 01</span><small>XML</small></div>
+                  <pre><code>&lt;!-- Spring Boot Dubbo 依赖 --&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;com.alibaba.spring.boot&lt;/groupId&gt;
+			&lt;artifactId&gt;dubbo-spring-boot-starter&lt;/artifactId&gt;
+			&lt;version&gt;2.0.0&lt;/version&gt;
+		&lt;/dependency&gt;
+		&lt;!--zookeeper依赖 --&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;org.apache.zookeeper&lt;/groupId&gt;
+			&lt;artifactId&gt;zookeeper&lt;/artifactId&gt;
+			&lt;version&gt;3.4.8&lt;/version&gt;
+		&lt;/dependency&gt;
+		&lt;dependency&gt;
+			&lt;groupId&gt;com.101tec&lt;/groupId&gt;
+			&lt;artifactId&gt;zkclient&lt;/artifactId&gt;
+			&lt;version&gt;0.10&lt;/version&gt;
+		&lt;/dependency&gt;</code></pre>
+                </div>
+                <p>接口的实现类项目和服务使用者需要单独引入api接口的pom配置</p>
+              </section>
+              <section class="article-section" id="yaml">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><p>YAML CONFIG</p><h2>提供者与消费者配置</h2></div>
+                </header>
+                <p>服务提供者的配置，注意scan扫描的位置，凡是要配置接口实现类的包都要扫描到</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 02</span><small>YAML</small></div>
+                  <pre><code>#spring.application.name=dubbo-provider
+server:
+  port: 8100
+#应用名称
+spring:
+  dubbo: 
+    application:
+#注册在注册中心的名称，唯一标识，请勿重复
+      id: auth-branch
+      name: auth-branch
+#注册中心地址，zookeeper集群，启动输出可以看见链接了多个
+#单zookeeper服务：zookeeper://127.0.0.1:2181
+    registry: 
+      address: zookeeper://127.0.0.1:2181?backup=127.0.0.1:2180,127.0.0.1:2182
+#暴露服务方式
+    protocol:
+      id: dubbo
+#默认名称，勿修改
+      name: dubbo
+#暴露服务端口 （默认是20880，修改端口，不同的服务提供者端口不能重复） 
+      port: 20881
+      status : server
+#调用dubbo组建扫描的项目路径
+    scan: com.demo.branch.impl</code></pre>
+                </div>
+                <p>服务调用者的配置，一样scan扫描的位置是需要调用服务类的位置</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 03</span><small>YAML</small></div>
+                  <pre><code>#spring.application.name=dubbo-consumer
+server: 
+  context-path: /auth
+  port: 8102
+#应用名称
+spring: 
+  dubbo:
+    application:
+      name: auth-consumer
+#注册中心地址
+    protocol:
+      name: dubbo
+    registry:
+      address: zookeeper://127.0.0.1:2181?backup=127.0.0.1:2180,127.0.0.1:2182
+#调用dubbo组建扫描的项目路径
+    scan: com.demo.controller
+#telnet端口
+    qos:
+      port: 22223
+#检查服务是否可用默认为true，不可用时抛出异常，阻止spring初始化，为方便部署，可以改成false
+    consumer: 
+      check: false</code></pre>
+                </div>
+                <p>服务调用者不需要配置端口，因为他会根据注解自动寻找对应的端口</p>
+                <p>接下来在所有的项目入口都加上dubbo的注解</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 04</span><small>JAVA</small></div>
+                  <pre><code>import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.web.bind.annotation.CrossOrigin;
+ 
+import com.alibaba.dubbo.spring.boot.annotation.EnableDubboConfiguration;
+ 
+@CrossOrigin//允许跨越访问
+@SpringBootApplication//springBoot项目入口
+@EnableDubboConfiguration
+public class AuthConsumerApplication {
+ 
+	public static void main(String[] args) {
+		SpringApplication.run(AuthConsumerApplication.class, args);
+	}
+}</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="provider">
+                <header class="section-heading">
+                  <span>04</span>
+                  <div><p>SERVICE PROVIDER</p><h2>定义接口与服务提供者</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 05</span><small>JAVA</small></div>
+                  <pre><code>public interface BranchService {
+ 
+	public String branchTest(String count);
+	
+}</code></pre>
+                </div>
+                <p>在auth-master和auth-branch项目中各自配置服务提供者接口的实现类</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 06</span><small>JAVA</small></div>
+                  <pre><code>import org.springframework.stereotype.Component;
+ 
+import com.alibaba.dubbo.config.annotation.Service;
+import com.demo.branch.service.BranchService;
+/**
+ * rpc服务接口实现类
+ */
+@Service(interfaceClass = BranchService.class) //dubbo的service，注入接口
+@Component //spring注解，扫描包
+public class AuthBranchImpl implements BranchService {
+ 
+	@Override
+	public String branchTest(String count) {
+		String re = &quot;AuthBranch服务调用成功：&quot;+count;
+		System.out.println(re);
+		return re;
+	}
+ 
+}</code></pre>
+                </div>
+                <p>两个服务提供者都按照这种方式注入，注意：service是引入dubbo的而不是 spring 的</p>
+                <p>阿里的service注解还提供了其他参数，包括版本号等：</p>
+              </section>
+              <section class="article-section" id="consumer">
+                <header class="section-heading">
+                  <span>05</span>
+                  <div><p>SERVICE CONSUMER</p><h2>配置服务消费者</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 07</span><small>JAVA</small></div>
+                  <pre><code>import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+ 
+import com.alibaba.dubbo.config.annotation.Reference;
+import com.demo.branch.service.BranchService;
+import com.demo.master.service.MasterService;
+ 
+@RestController
+@RequestMapping(&quot;/consumer&quot;)
+public class ConsumerController {
+	static final String branchUrl = &quot;dubbo://127.0.0.1:20881&quot;;
+	static final String masterUrl = &quot;dubbo://127.0.0.1:20880&quot;;
+	
+	
+	@Reference(url = branchUrl)
+	BranchService branchService;
+	
+	@Reference(url = masterUrl)
+	MasterService masterService;
+	
+    @RequestMapping(&quot;branch&quot;)
+    public String branch() {
+    	System.out.println(&quot;-----dubbo服务测试方法-----同时调用多个dubbo服务测试-----&quot;);
+    	String re = branchService.branchTest(&quot;consumer 请求服务&quot;);
+    	return re;
+    }
+    
+    @RequestMapping(&quot;master&quot;)
+    public String master() {
+    	System.out.println(&quot;-----dubbo服务测试方法-----同时调用多个dubbo服务测试-----&quot;);
+    	String re = masterService.masterTest(&quot;consumer 请求服务&quot;);
+    	return re;
+    }
+ 
+}</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="verification">
+                <header class="section-heading">
+                  <span>06</span>
+                  <div><p>RUN &amp; VERIFY</p><h2>启动顺序与调用验证</h2></div>
+                </header>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-dubbo-zookeeper/dubbo-startup.png" alt="Dubbo 与 Spring Boot 启动日志" loading="lazy">
+                  <figcaption>Dubbo 与 Spring Boot 启动日志</figcaption>
+                </figure>
+                <p>看到这个图标 说明dubbo服务开始启动，看控制台打印的信息</p>
+                <p>然后分别调用两个接口</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-dubbo-zookeeper/dubbo-call-master.png" alt="调用第一个 Dubbo 服务的返回结果" loading="lazy">
+                  <figcaption>调用第一个 Dubbo 服务的返回结果</figcaption>
+                </figure>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-dubbo-zookeeper/dubbo-call-branch.png" alt="调用第二个 Dubbo 服务的返回结果" loading="lazy">
+                  <figcaption>调用第二个 Dubbo 服务的返回结果</figcaption>
+                </figure>
+                <p>返回成功，基础的项目搭建完毕。</p>
+                <p>示例项目地址：<a href="https://gitee.com/xzxWord/SpringBootIntegrateDubbo" target="_blank" rel="noopener noreferrer">https://gitee.com/xzxWord/SpringBootIntegrateDubbo</a></p>
+                <p>有问题的同学请留言，希望能一起跨过各种的坑，谢谢</p>
+              </section>
+
+              <section class="article-section" id="references">
+                <header class="section-heading"><span>07</span><div><p>MIGRATION &amp; SOURCE</p><h2>迁移说明与原始来源</h2></div></header>
+                <p>本文由本地保存的 CSDN 正文迁移而来，保留原始实践步骤、代码与截图，并对标题层级、段落和版本提示进行了重新整理。</p>
+                <div class="source-note">
+                  <strong>原始文章</strong>
+                  <p>《Spring Boot 注解整合 Dubbo 与 ZooKeeper》，原发布于 2018-04-13。示例环境与结论应结合文章中的版本背景阅读。</p>
+                  <a href="https://blog.csdn.net/penyoudi1/article/details/79930745" target="_blank" rel="noopener noreferrer">查看 CSDN 原文 ↗</a>
+                </div>
+              </section>
+
+              <div class="article-end" aria-label="文章结束"><span></span><strong>✦</strong><span></span><p>从接口契约开始构建可维护的 RPC 服务</p></div>
+            </div>
+
+            <aside class="reading-sidebar reading-sidebar--archive">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">ARTICLE CARD</p><h2>工程档案</h2>
+                <div class="progress-orbit progress-orbit--text"><strong>04</strong><small>RPC SERVICE</small></div>
+                <dl class="archive-facts">
+                  <div><dt>领域</dt><dd>Java 与工程</dd></div>
+                  <div><dt>类型</dt><dd>RPC 服务</dd></div>
+                  <div><dt>注册中心</dt><dd>ZooKeeper</dd></div>
+                  <div><dt>难度</dt><dd>进阶</dd></div>
+                  <div><dt>状态</dt><dd><span class="status-dot"></span>历史整理</dd></div>
+                </dl>
+                <a class="archive-action" href="../../index.html">浏览更多文章 →</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <nav class="article-pagination" aria-label="文章翻页">
+          <a href="../java-string-memory/index.html"><small>上一篇</small><strong>Java String 与 new String 的内存存储</strong></a>
+          <span aria-hidden="true">✦</span>
+          <a href="../spring-boot-redis-cluster/index.html"><small>下一篇</small><strong>Spring Boot 整合 Redis 集群</strong></a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="fantasy-footer"><div class="footer-copy"><p><span></span> 知识如星辰，记录即永恒。 <span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer>
+  </div>
+</body>
+</html>

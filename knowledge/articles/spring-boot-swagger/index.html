@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="整理 Spring Boot 项目中 Springfox Swagger 的依赖、配置、接口注解与生产环境关闭方式。">
+  <meta name="keywords" content="Spring Boot,Swagger,API 文档,Java 与工程,工具与效率">
+  <meta name="article:realm" content="java-engineering,tools-productivity">
+  <title>Swagger 搭建（基于 Spring Boot） · Arcane Archive</title>
+  <link rel="icon" type="image/png" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-4">
+</head>
+<body>
+  <div class="detail-shell">
+    <div class="frame-lines" aria-hidden="true"></div>
+    <img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="" aria-hidden="true">
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="主导航">
+        <a class="brand" href="../../../index.html">
+          <img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt="" aria-hidden="true">
+          <span>xzx-wu</span><small>Arcane Archive</small>
+        </a>
+        <div class="nav-links">
+          <a href="../../../index.html">首页</a>
+          <a class="is-active" href="../../index.html" aria-current="page">知识卷轴</a>
+          <a href="../../../journeys/index.html">学习旅程</a>
+          <a href="../../../about/index.html">关于</a>
+          <a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon" aria-hidden="true"></span>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero article-hero--engineering">
+          <div class="article-hero__shade" aria-hidden="true"></div>
+          <div class="article-hero__inner">
+            <div class="article-hero__copy">
+              <nav class="breadcrumb" aria-label="面包屑导航"><a href="../../index.html">知识卷轴</a><span aria-hidden="true">✦</span><span>Java 与工程</span></nav>
+              <p class="article-kicker">ENGINEERING · API DOCUMENTATION</p>
+              <h1>Swagger 搭建<br>基于 Spring Boot</h1>
+              <p class="article-deck">从 Maven 依赖、配置类到 Controller 注解，整理一套早期 Springfox Swagger 的接入流程。</p>
+              <div class="article-meta" aria-label="文章信息">
+                <time datetime="2018-01-22">2018-01-22</time>
+                <span>Java 与工程</span>
+                <span>工具与效率</span>
+                <span>约 10 分钟阅读</span>
+              </div>
+            </div>
+            <div class="chapter-seal" aria-label="工程档案第 02 篇"><span>ENGINEERING LOG</span><strong>02</strong><small>API DOCS</small></div>
+          </div>
+        </header>
+
+        <div class="reading-stage">
+          <div class="reading-layout">
+            <aside class="reading-sidebar reading-sidebar--toc">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2>
+                <nav class="article-toc" aria-label="文章目录">
+                  <a href="#background"><span>01</span>为什么需要 Swagger</a>
+                  <a href="#dependency"><span>02</span>引入 Maven 依赖</a>
+                  <a href="#configuration"><span>03</span>配置 Swagger</a>
+                  <a href="#controller"><span>04</span>在 Controller 中使用注解</a>
+                  <a href="#annotations"><span>05</span>常用配置与注解说明</a>
+                  <a href="#issues"><span>06</span>使用中遇到的问题</a>
+                  <a href="#production"><span>07</span>隐藏字段与生产环境关闭</a>
+                  <a href="#references"><span>08</span>迁移说明与来源</a>
+                </nav>
+                <a class="back-link" href="../../index.html">← 返回知识卷轴</a>
+              </div>
+            </aside>
+
+            <div class="article-body">
+              <section class="opening-note"><span class="opening-note__mark" aria-hidden="true">“</span><div><p>接口文档只有与代码同步，才能真正降低前后端协作成本。</p><small>历史工程档案 · Springfox Swagger</small></div></section>
+
+              <section class="article-section" id="background">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><p>WHY SWAGGER</p><h2>为什么需要 Swagger</h2></div>
+                </header>
+                <div class="article-callout">
+                  <strong>版本背景</strong>
+                  <p>本文迁移自 2018 年实践记录，示例使用 Springfox 时代的 Swagger API。依赖版本、访问路径与注解能力应以实际项目版本为准。</p>
+                </div>
+                <p>前后端分离 后，api接口文档的维护就成了一个让人头疼的问题，api接口更新慢，或因开发工作量大，没时间整理文档，导致前后端分离后前端同学和后端同学都纠结于文档的问题。而swagger的出现，不亚于一道曙光，功能强大，ui简洁美观，提供在线测试，不能说完美，但基本上解决了文档的问题</p>
+                <p>本此搭建是基于springBoot项目，希望对大家有帮助</p>
+                <p>官方网站为：<a href="http://swagger.io/" target="_blank" rel="noopener noreferrer">http://swagger.io/</a></p>
+              </section>
+              <section class="article-section" id="dependency">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><p>MAVEN</p><h2>引入 Maven 依赖</h2></div>
+                </header>
+                <p>在maven的pom文件中引入相关的依赖</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 01</span><small>XML</small></div>
+                  <pre><code>&lt;dependency&gt;
+		    &lt;groupId&gt;io.springfox&lt;/groupId&gt;
+		    &lt;artifactId&gt;springfox-swagger2&lt;/artifactId&gt;
+		    &lt;version&gt;2.2.2&lt;/version&gt;
+		&lt;/dependency&gt;
+		&lt;dependency&gt;
+		    &lt;groupId&gt;io.springfox&lt;/groupId&gt;
+		    &lt;artifactId&gt;springfox-swagger-ui&lt;/artifactId&gt;
+		    &lt;version&gt;2.2.2&lt;/version&gt;
+		&lt;/dependency&gt;</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="configuration">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><p>CONFIGURATION</p><h2>配置 Swagger</h2></div>
+                </header>
+                <div class="code-block code-block--large">
+                  <div class="code-block__label"><span>示例 02</span><small>JAVA</small></div>
+                  <pre><code>import java.util.ArrayList;
+import java.util.List;
+ 
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+ 
+import springfox.documentation.builders.ParameterBuilder;
+import springfox.documentation.builders.ApiInfoBuilder;
+import springfox.documentation.builders.PathSelectors;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.schema.ModelRef;
+import springfox.documentation.service.ApiInfo;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+import springfox.documentation.service.Parameter;
+@Configuration
+@EnableSwagger2
+public class Swagger2 {
+ 
+    @Bean
+    public Docket createRestApi() {
+	 	ParameterBuilder tokenPar = new ParameterBuilder();  
+        List&lt;Parameter&gt; pars = new ArrayList&lt;Parameter&gt;();  
+        tokenPar.name(&quot;token&quot;).description(&quot;令牌&quot;)
+        .modelRef(new ModelRef(&quot;string&quot;)).parameterType(&quot;query&quot;).required(false).build();  
+        pars.add(tokenPar.build());  
+        return new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(apiInfo())
+                .select()
+                .apis(RequestHandlerSelectors.basePackage(&quot;com.sst&quot;))
+                .paths(PathSelectors.any())
+                .build().globalOperationParameters(pars)  ;
+    }
+ 
+    @SuppressWarnings(&quot;deprecation&quot;)
+	private ApiInfo apiInfo() {
+        return new ApiInfoBuilder()
+                .title(&quot;个人测试&quot;)
+                .description(&quot;个人测试用api&quot;)
+                .termsOfServiceUrl(&quot;http://blog.csdn.net/penyoudi1&quot;)
+                .contact(&quot;测试&quot;)
+                .version(&quot;1.0&quot;)
+                .build();
+    }
+ 
+}</code></pre>
+                </div>
+              </section>
+              <section class="article-section" id="controller">
+                <header class="section-heading">
+                  <span>04</span>
+                  <div><p>CONTROLLER</p><h2>在 Controller 中使用注解</h2></div>
+                </header>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 03</span><small>JAVA</small></div>
+                  <pre><code>import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+ 
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
+import io.swagger.annotations.ApiImplicitParams;
+import io.swagger.annotations.ApiOperation;
+ 
+@RestController  
+@RequestMapping(&quot;test&quot;) 
+@Api(value=&quot;测试接口Controller&quot;)
+public class TestController {
+ 
+	@ApiOperation(value=&quot;测试用接口&quot;, notes=&quot;测试用接口&quot; ,httpMethod=&quot;POST&quot;)
+	@ApiImplicitParams({
+		@ApiImplicitParam(name=&quot;name&quot;, value=&quot;用户姓名&quot;, dataType = &quot;String&quot;, required=true, paramType=&quot;form&quot;),
+		@ApiImplicitParam(name=&quot;id&quot;, value=&quot;id&quot;, dataType = &quot;int&quot;, required=false, paramType=&quot;form&quot;)
+	})
+    @RequestMapping(&quot;word&quot;)  
+    public String HelloWord(String name,Integer id) {  
+        return &quot;Hello Word&quot;;  
+    }
+	
+	
+}</code></pre>
+                </div>
+                <p>然后输入地址 <a href="http://127.0.0.1:8080/SpringSwaggerTest/swagger-ui.html" target="_blank" rel="noopener noreferrer">http://127.0.0.1:8080/SpringSwaggerTest/swagger-ui.html</a></p>
+                <p>可以查看到</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-ui-overview.png" alt="Swagger UI 接口详情与在线调试页面" loading="lazy">
+                  <figcaption>Swagger UI 接口详情与在线调试页面</figcaption>
+                </figure>
+                <p>看到这个页面，说明配置成功！！</p>
+              </section>
+              <section class="article-section" id="annotations">
+                <header class="section-heading">
+                  <span>05</span>
+                  <div><p>ANNOTATIONS</p><h2>常用配置与注解说明</h2></div>
+                </header>
+                <p>swagger配置文件说明</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 04</span><small>CODE</small></div>
+                  <pre><code>ParameterBuilder tokenPar = new ParameterBuilder();  
+        List&lt;Parameter&gt; pars = new ArrayList&lt;Parameter&gt;();  
+        tokenPar.name(&quot;token&quot;).description(&quot;令牌&quot;)
+        .modelRef(new ModelRef(&quot;string&quot;)).parameterType(&quot;query&quot;).required(false).build();  
+        pars.add(tokenPar.build());</code></pre>
+                </div>
+                <p>这段代码是默认参数，添加上后，所有的接口都会有一个公共参数，不需要在每个接口单独配置</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 05</span><small>CODE</small></div>
+                  <pre><code>.apis(RequestHandlerSelectors.basePackage(&quot;com.sst&quot;))</code></pre>
+                </div>
+                <p>这个是基于基于注解扫描的位置，写到目录最外层即可</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 06</span><small>CODE</small></div>
+                  <pre><code>return new ApiInfoBuilder()
+                .title(&quot;个人测试&quot;)
+                .description(&quot;个人测试用api&quot;)
+                .termsOfServiceUrl(&quot;http://blog.csdn.net/penyoudi1&quot;)
+                .contact(&quot;测试&quot;)
+                .version(&quot;1.0&quot;)
+                .build();
+    }</code></pre>
+                </div>
+                <p>这个是一些页面展示数据的配置，用于标题，分组说明等</p>
+                <p>controller注解说明</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 07</span><small>JAVA</small></div>
+                  <pre><code>@Api(value=&quot;测试接口Controller&quot;)</code></pre>
+                </div>
+                <p>这个注解用于整个 类 上，对整个类中的接口列表进行简单说明</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 08</span><small>JAVA</small></div>
+                  <pre><code>@ApiOperation(value=&quot;测试用接口&quot;, notes=&quot;测试用接口&quot; ,httpMethod=&quot;POST&quot;)</code></pre>
+                </div>
+                <p>value 和notes都是对接口的说明，是显示的位置不一样</p>
+                <p>httpMethod 是接口的提交方法，如果不写的话swagger会把所有的提交方式都展示一遍就像这样</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-http-methods.png" alt="Swagger UI 展示多个 HTTP 请求方法" loading="lazy">
+                  <figcaption>Swagger UI 展示多个 HTTP 请求方法</figcaption>
+                </figure>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 09</span><small>JAVA</small></div>
+                  <pre><code>@ApiImplicitParams({
+		@ApiImplicitParam(name=&quot;name&quot;, value=&quot;用户姓名&quot;, dataType = &quot;String&quot;, required=true, paramType=&quot;form&quot;),
+		@ApiImplicitParam(name=&quot;id&quot;, value=&quot;id&quot;, dataType = &quot;int&quot;, required=false, paramType=&quot;form&quot;)
+	})</code></pre>
+                </div>
+                <p>@ApiImplicitParams是传入参数的集合，里面可以包含多个参数</p>
+                <p>@ApiImplicitParam(name=&quot;name&quot;, value=&quot;用户姓名&quot;, dataType = &quot;String&quot;, required=true, paramType=&quot; form &quot;),</p>
+                <p>name是参数的名称，value是参数的说明，dataType是参数的类型，前端不是限制，仅做说明使用，required true时是必传参数，false是选填参数。paramType是提交方式=-= 好像都是写的from</p>
+                <p>以上就是基本的使用的参数说明</p>
+              </section>
+              <section class="article-section" id="issues">
+                <header class="section-heading">
+                  <span>06</span>
+                  <div><p>TROUBLESHOOTING</p><h2>使用中遇到的问题</h2></div>
+                </header>
+                <p>1.在开发中遇到过，使用swagger做excel导出中文乱码的问题，尚未解决，如果你也遇到了，可以单独访问下接口，尝试下是否是swagger本身的问题</p>
+              </section>
+              <section class="article-section" id="production">
+                <header class="section-heading">
+                  <span>07</span>
+                  <div><p>PRODUCTION SAFETY</p><h2>隐藏字段与生产环境关闭</h2></div>
+                </header>
+                <p>在实际开发中遇到过两个问题都已经处理，希望给其他同学提供帮助</p>
+                <p>1.当传入的参数用对象接的时候，swagger会将对象中的信息都展示出来当做传参，虽不影响使用，但容易混淆</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-api-operation.png" alt="Swagger 接口说明展示效果" loading="lazy">
+                  <figcaption>Swagger 接口说明展示效果</figcaption>
+                </figure>
+                <p>这个时候可以在具体的实体类上追加一段注解，将对象所包含的属性默认隐藏</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-parameters.png" alt="Swagger 接口参数展示效果" loading="lazy">
+                  <figcaption>Swagger 接口参数展示效果</figcaption>
+                </figure>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 10</span><small>JAVA</small></div>
+                  <pre><code>@ApiParam(hidden = true)</code></pre>
+                </div>
+                <p>添加完成后当你不在controller配置的话，这些属性不会展示到swagger中</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-model-properties.png" alt="Swagger 对象字段展示效果" loading="lazy">
+                  <figcaption>Swagger 对象字段展示效果</figcaption>
+                </figure>
+                <p>2.swagger在开发过程中好用，但是生产环境下必须屏蔽swagger，不然很容易让人利用swagger执行对库操作，安全隐患非常大，在springboot下可以通过多环境的yml配置文件来屏蔽生产环境下swagger的使用，具体配置如下：</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-hidden-properties.png" alt="隐藏对象字段后的 Swagger 展示效果" loading="lazy">
+                  <figcaption>隐藏对象字段后的 Swagger 展示效果</figcaption>
+                </figure>
+                <p>在swagger的配置文件上加一行注解</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 11</span><small>CODE</small></div>
+                  <pre><code>@ConditionalOnProperty(prefix = &quot;swagger&quot;,value = {&quot;enable&quot;},havingValue = &quot;true&quot;)</code></pre>
+                </div>
+                <p>然后再yml文件中配置：</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例 12</span><small>CODE</small></div>
+                  <pre><code>swagger:
+  enable: true</code></pre>
+                </div>
+                <p>生产环境下将true改为false这样swagger就不再展示</p>
+                <figure class="article-figure">
+                  <img src="../../../assets/images/articles/spring-boot-swagger/swagger-disabled.png" alt="通过配置关闭 Swagger 后的访问效果" loading="lazy">
+                  <figcaption>通过配置关闭 Swagger 后的访问效果</figcaption>
+                </figure>
+              </section>
+
+              <section class="article-section" id="references">
+                <header class="section-heading"><span>08</span><div><p>MIGRATION &amp; SOURCE</p><h2>迁移说明与原始来源</h2></div></header>
+                <p>本文由本地保存的 CSDN 正文迁移而来，保留原始实践步骤、代码与截图，并对标题层级、段落和版本提示进行了重新整理。</p>
+                <div class="source-note">
+                  <strong>原始文章</strong>
+                  <p>《Swagger 搭建（基于 Spring Boot）》，原发布于 2018-01-22。示例环境与结论应结合文章中的版本背景阅读。</p>
+                  <a href="https://blog.csdn.net/penyoudi1/article/details/79067386" target="_blank" rel="noopener noreferrer">查看 CSDN 原文 ↗</a>
+                </div>
+              </section>
+
+              <div class="article-end" aria-label="文章结束"><span></span><strong>✦</strong><span></span><p>让接口文档跟随代码一起演进</p></div>
+            </div>
+
+            <aside class="reading-sidebar reading-sidebar--archive">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">ARTICLE CARD</p><h2>工程档案</h2>
+                <div class="progress-orbit progress-orbit--text"><strong>02</strong><small>API DOCS</small></div>
+                <dl class="archive-facts">
+                  <div><dt>领域</dt><dd>Java 与工程</dd></div>
+                  <div><dt>关联</dt><dd>工具与效率</dd></div>
+                  <div><dt>框架</dt><dd>Springfox</dd></div>
+                  <div><dt>难度</dt><dd>入门</dd></div>
+                  <div><dt>状态</dt><dd><span class="status-dot"></span>历史整理</dd></div>
+                </dl>
+                <a class="archive-action" href="../../index.html">浏览更多文章 →</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <nav class="article-pagination" aria-label="文章翻页">
+          <a href="../linux-deploy-spring-boot/index.html"><small>上一篇</small><strong>Linux 部署 Spring Boot 项目</strong></a>
+          <span aria-hidden="true">✦</span>
+          <a href="../java-string-memory/index.html"><small>下一篇</small><strong>Java String 与 new String 的内存存储</strong></a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="fantasy-footer"><div class="footer-copy"><p><span></span> 知识如星辰，记录即永恒。 <span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer>
+  </div>
+</body>
+</html>
