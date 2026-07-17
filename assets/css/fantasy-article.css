@@ -97,7 +97,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 .brand > span { font-size: 1.2rem; font-weight: 700; letter-spacing: 0.04em; }
 .brand small { padding-left: 12px; border-left: 1px solid var(--line); font-size: 0.82rem; font-weight: 400; letter-spacing: 0.08em; }
 
-.nav-links { position: absolute; inset: 0 auto 0 57%; display: flex; align-items: stretch; gap: 38px; transform: translateX(-50%); }
+.nav-links { position: absolute; inset: 0 auto 0 60%; display: flex; align-items: stretch; gap: 30px; transform: translateX(-50%); }
 .nav-links a { position: relative; display: flex; align-items: center; white-space: nowrap; color: #c8b990; font-family: var(--serif); font-size: 0.96rem; letter-spacing: 0.06em; transition: color 180ms ease; }
 .nav-links a::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: var(--gold-bright); transform: scaleX(0); transition: transform 180ms ease; }
 .nav-links a:hover,

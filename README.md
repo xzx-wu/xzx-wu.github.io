@@ -1,6 +1,6 @@
 # xzx-wu.github.io
 
-xzx-wu 的个人博客，包含“知识卷轴”和“学习旅程”两个主要内容入口。
+xzx-wu 的个人博客，包含“知识卷轴”“学习旅程”和“友人星图”等内容入口。
 
 网站地址：<https://xzx-wu.github.io>
 
@@ -14,6 +14,9 @@ knowledge/
 journeys/
 └── 课程名称/
     └── day-xx/      # 每个学习日可包含多篇笔记和独立素材
+
+friends/
+└── index.html       # 朋友博客与友人档案
 ```
 
 知识文章可以同时关联多个探索领域：
@@ -23,4 +26,4 @@ journeys/
 - 工具与效率：`tools-productivity`
 - 思考与复盘：`thinking-reflection`
 
-页面样式与脚本统一放在 `assets/`，设计原型和原始素材放在 `design/`，旧版页面备份放在 `archive/`。
+友人博客数据集中维护在 `assets/js/friends-catalog.js`。页面样式与脚本统一放在 `assets/`，设计原型和原始素材放在 `design/`，旧版页面备份放在 `archive/`。
