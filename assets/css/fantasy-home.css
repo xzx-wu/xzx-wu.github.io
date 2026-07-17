@@ -158,7 +158,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 .hero-kicker { display: none; }
 .hero-kicker span { width: 52px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold)); }
 .hero-kicker span:last-child { transform: scaleX(-1); }
-.hero h1 { margin: 0; color: #ddc58f; font-family: var(--serif); font-size: clamp(2.8rem, 4vw, 4.4rem); font-weight: 700; line-height: 1.16; letter-spacing: 0.035em; }
+.hero h1 { margin: 0; color: #ddc58f; font-family: var(--serif); font-size: clamp(2.3rem, 3.2vw, 3.55rem); font-weight: 700; line-height: 1.16; letter-spacing: 0.035em; }
 .hero-copy > p:last-child { margin: 13px 0 0; color: var(--ivory); font-family: var(--serif); font-size: clamp(0.96rem, 1.2vw, 1.18rem); letter-spacing: 0.16em; }
 
 .content-stage {
@@ -271,7 +271,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
   .hero { min-height: 440px; background-position: 12% center; }
   .hero-shade { background: rgba(2, 8, 15, 0.62); }
   .hero-copy { width: calc(100% - 42px); margin: 0 auto; padding-top: 96px; }
-  .hero h1 { font-size: clamp(2.35rem, 11vw, 3.4rem); }
+  .hero h1 { font-size: clamp(2rem, 9vw, 2.85rem); }
   .hero-copy > p:last-child { letter-spacing: 0.08em; }
   .content-stage { padding: 18px 16px; }
   .dashboard-grid { grid-template-columns: 1fr; }

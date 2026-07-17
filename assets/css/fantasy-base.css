@@ -41,10 +41,19 @@ img { max-width: 100%; }
   width: min(1600px, calc(100% - 10px));
   min-height: calc(100vh - 10px);
   margin: 5px auto;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--navy);
   border: 1px solid rgba(228, 199, 127, 0.68);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.64), inset 0 0 60px rgba(0, 0, 0, 0.55);
+}
+
+.archive-shell > main {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .archive-shell::before,

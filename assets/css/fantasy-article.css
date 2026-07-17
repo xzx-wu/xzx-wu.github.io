@@ -151,7 +151,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 .breadcrumb a:hover { color: var(--gold-bright); }
 .breadcrumb span[aria-hidden] { color: var(--gold); font-size: 0.62rem; }
 .article-kicker { margin: 22px 0 8px; color: var(--gold); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.2em; }
-.article-hero h1 { margin: 0; color: #e0c996; font-family: var(--serif); font-size: clamp(2.8rem, 4.8vw, 5rem); line-height: 1.13; letter-spacing: 0.04em; text-shadow: 0 5px 28px #000; }
+.article-hero h1 { margin: 0; color: #e0c996; font-family: var(--serif); font-size: clamp(2.3rem, 3.6vw, 3.75rem); line-height: 1.13; letter-spacing: 0.04em; text-shadow: 0 5px 28px #000; }
 .article-deck { max-width: 620px; margin: 16px 0 0; color: #b8ae98; font-family: var(--serif); font-size: 1rem; letter-spacing: 0.05em; }
 .article-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
 .article-meta > * { padding: 4px 11px; color: #bdb092; background: rgba(5, 16, 27, 0.68); border: 1px solid rgba(201, 164, 92, 0.28); border-radius: 999px; font-size: 0.7rem; }
@@ -340,7 +340,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
   .article-hero--engineering { background-position: center, center, 72% 18%, center; background-size: auto, auto, 330px auto, auto; }
   .article-hero__shade { background: linear-gradient(180deg, rgba(5, 13, 23, 0.3), rgba(5, 13, 23, 0.96) 75%); }
   .article-hero__inner { width: calc(100% - 46px); min-height: 510px; padding: 68px 0 35px; grid-template-columns: 1fr; align-content: end; gap: 28px; }
-  .article-hero h1 { font-size: clamp(2.5rem, 11vw, 4rem); }
+  .article-hero h1 { font-size: clamp(2.1rem, 9vw, 3.1rem); }
   .chapter-seal { display: none; }
   .reading-layout { width: calc(100% - 34px); padding: 40px 0 56px; grid-template-columns: 1fr; gap: 34px; }
   .reading-sidebar--archive { grid-row: 1; }
@@ -358,7 +358,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
   .nav-links .github-link { display: none; }
   .article-hero { min-height: 500px; }
   .article-hero__inner { padding-bottom: 30px; }
-  .article-hero h1 { font-size: 2.65rem; }
+  .article-hero h1 { font-size: 2.2rem; }
   .article-deck { font-size: 0.88rem; }
   .article-meta { gap: 6px; }
   .reading-sidebar--archive .sidebar-card { display: block; }
