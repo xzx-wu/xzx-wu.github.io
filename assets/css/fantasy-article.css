@@ -37,7 +37,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 .detail-shell {
   isolation: isolate;
   position: relative;
-  width: min(1600px, calc(100% - 10px));
+  width: calc(100% - 10px);
   margin: 5px auto;
   overflow: hidden;
   background: var(--navy);
@@ -84,7 +84,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 
 .site-nav {
   position: relative;
-  width: min(1360px, calc(100% - 110px));
+  width: min(1760px, calc(100% - 110px));
   min-height: 68px;
   margin: 0 auto;
   display: flex;

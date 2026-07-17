@@ -19,7 +19,7 @@
     url("../images/fantasy/article-celestial-manuscript.webp") center 48% / cover no-repeat;
 }
 
-.listing-hero__inner { position: relative; width: min(1180px, calc(100% - 110px)); margin: 0 auto; padding: 58px 0 52px; }
+.listing-hero__inner { position: relative; width: min(1560px, calc(100% - 110px)); margin: 0 auto; padding: 58px 0 52px; }
 .listing-kicker { margin: 0 0 8px; color: var(--gold); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.22em; }
 .listing-hero h1 { margin: 0; color: #e0c996; font-family: var(--serif); font-size: clamp(2rem, 3vw, 3rem); line-height: 1.1; letter-spacing: 0.06em; text-shadow: 0 5px 28px #000; }
 .listing-hero__copy { max-width: 650px; margin: 13px 0 0; color: #b7ac95; font-family: var(--serif); font-size: 1rem; letter-spacing: 0.04em; }
@@ -38,7 +38,7 @@
   background-size: auto, 100% 42px, auto;
 }
 
-.listing-container { width: min(1240px, calc(100% - 80px)); margin: 0 auto; }
+.listing-container { width: min(1640px, calc(100% - 80px)); margin: 0 auto; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; padding-bottom: 11px; border-bottom: 1px solid var(--line); }
 .section-title > div { display: flex; align-items: center; gap: 10px; }
 .section-title__symbol { color: var(--gold); font-size: 1.2rem; }

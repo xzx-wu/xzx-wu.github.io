@@ -38,7 +38,7 @@ img { max-width: 100%; }
 .archive-shell {
   isolation: isolate;
   position: relative;
-  width: min(1600px, calc(100% - 10px));
+  width: calc(100% - 10px);
   min-height: calc(100vh - 10px);
   margin: 5px auto;
   display: flex;
@@ -97,7 +97,7 @@ img { max-width: 100%; }
 
 .site-nav {
   position: relative;
-  width: min(1360px, calc(100% - 110px));
+  width: min(1760px, calc(100% - 110px));
   min-height: 68px;
   margin: 0 auto;
   display: flex;
