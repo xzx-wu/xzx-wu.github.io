@@ -202,7 +202,7 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 .article-list-item small { color: #716b5e; font-size: 0.62rem; }
 
 .journey-panel { display: flex; flex-direction: column; align-items: stretch; }
-.journey-orbit { position: relative; width: min(174px, 78%); aspect-ratio: 1; margin: 3px auto 11px; display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; box-shadow: inset 0 0 0 8px rgba(3, 10, 18, 0.9), inset 0 0 0 9px var(--line), 0 0 34px rgba(201, 164, 92, 0.08); }
+.journey-orbit { position: relative; width: min(154px, 74%); aspect-ratio: 1; margin: auto auto 12px; display: grid; place-items: center; border: 1px solid var(--gold); border-radius: 50%; box-shadow: inset 0 0 0 8px rgba(3, 10, 18, 0.9), inset 0 0 0 9px var(--line), 0 0 34px rgba(201, 164, 92, 0.08); }
 .journey-orbit::before,
 .journey-orbit::after { content: ""; position: absolute; border-radius: 50%; }
 .journey-orbit::before { inset: 12%; border: 1px dashed rgba(201, 164, 92, 0.55); transform: rotate(18deg); }
@@ -214,8 +214,8 @@ a:focus-visible { outline: 2px solid var(--gold-bright); outline-offset: 4px; }
 .orbit-dot { position: absolute; width: 8px; height: 8px; background: var(--gold-bright); border-radius: 50%; box-shadow: 0 0 10px var(--gold); }
 .orbit-dot--one { top: 13%; left: 22%; }
 .orbit-dot--two { right: 13%; bottom: 26%; }
-.journey-card { margin-top: auto; padding: 11px 13px; display: grid; justify-items: center; gap: 1px; text-align: center; background: linear-gradient(135deg, rgba(27, 62, 48, 0.72), rgba(8, 26, 27, 0.9)); border: 1px solid rgba(201, 164, 92, 0.65); box-shadow: inset 0 0 0 4px rgba(2, 9, 17, 0.55); }
-.journey-card strong { color: var(--gold-bright); font-family: var(--serif); font-size: 1.32rem; }
+.journey-card { width: 100%; margin: 0 0 auto; padding: 10px 12px; display: grid; justify-items: center; gap: 1px; text-align: center; background: linear-gradient(135deg, rgba(27, 62, 48, 0.72), rgba(8, 26, 27, 0.9)); border: 1px solid rgba(201, 164, 92, 0.65); box-shadow: inset 0 0 0 4px rgba(2, 9, 17, 0.55); }
+.journey-card strong { color: var(--gold-bright); font-family: var(--serif); font-size: 1.2rem; }
 .journey-card span { color: #bfb08c; font-size: 0.8rem; }
 .journey-card em { margin-top: 4px; color: var(--gold); font-size: 0.7rem; font-style: normal; }
 
