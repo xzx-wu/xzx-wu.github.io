@@ -23,7 +23,11 @@ friends/
 
 - AI 与智能体：`ai-agents`
 - Java 与工程：`java-engineering`
-- 工具与效率：`tools-productivity`
+- 数据库：`databases`
+- 数据结构与算法：`data-structures-algorithms`
+- 框架与中间件：`frameworks-middleware`
+- 分布式系统：`distributed-systems`
+- 运维与可观测性：`operations-observability`
 - 思考与复盘：`thinking-reflection`
 
 友人博客数据集中维护在 `assets/js/friends-catalog.js`。页面样式与脚本统一放在 `assets/`，设计原型和原始素材放在 `design/`，旧版页面备份放在 `archive/`。

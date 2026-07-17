@@ -1,0 +1,57 @@
+<!doctype html><html lang="zh-CN"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="系统理解 Java ThreadPoolExecutor 的核心参数、任务提交顺序、队列选择、拒绝策略、监控指标和优雅关闭。"><meta name="keywords" content="Java,线程池,ThreadPoolExecutor,BlockingQueue,拒绝策略"><meta name="article:realm" content="java-engineering"><title>Java 线程池参数、队列与拒绝策略 · Arcane Archive</title><link rel="icon" href="../../../assets/images/fantasy/favicon.png"><link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-7">
+</head><body><div class="detail-shell"><div class="frame-lines"></div><img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="">
+  <header class="site-header"><nav class="site-nav"><a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt=""><span>xzx-wu</span><small>Arcane Archive</small></a><div class="nav-links"><a href="../../../index.html">首页</a><a class="is-active" href="../../index.html">知识卷轴</a><a href="../../../journeys/index.html">学习旅程</a><a href="../../../about/index.html">关于</a><a href="../../../friends/index.html">友人星图</a><a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon"></span>GitHub</a></div></nav></header>
+  <main><article><header class="article-hero article-hero--engineering"><div class="article-hero__shade"></div><div class="article-hero__inner"><div class="article-hero__copy"><nav class="breadcrumb"><a href="../../index.html">知识卷轴</a><span>✦</span><span>Java 与工程</span></nav><p class="article-kicker">CONCURRENCY · EXECUTOR</p><h1>Java 线程池参数<br>队列与拒绝策略</h1><p class="article-deck">把任务处理能力变成可度量、可限流、可拒绝、可关闭的工程边界。</p><div class="article-meta"><time datetime="2026-07-17">2026-07-17</time><span>Java</span><span>线程池</span><span>约 18 分钟阅读</span></div></div><div class="chapter-seal"><span>CONCURRENCY</span><strong>06</strong><small>EXECUTOR</small></div></div></header>
+    <div class="reading-stage"><div class="reading-layout"><aside class="reading-sidebar reading-sidebar--toc"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2><nav class="article-toc"><a href="#flow"><span>01</span>任务提交顺序</a><a href="#params"><span>02</span>核心参数</a><a href="#queues"><span>03</span>队列选择</a><a href="#reject"><span>04</span>拒绝策略</a><a href="#config"><span>05</span>配置示例</a><a href="#sizing"><span>06</span>容量估算</a><a href="#observe"><span>07</span>监控与关闭</a><a href="#references"><span>08</span>总结与来源</a></nav><a class="back-link" href="../../index.html">← 返回知识卷轴</a></div></aside>
+      <div class="article-body"><section class="opening-note"><span class="opening-note__mark">“</span><div><p>线程池不是让任务无限变快，而是给并发执行建立容量上限、排队规则和过载响应。</p><small>并发档案 · ThreadPoolExecutor</small></div></section>
+        <section class="article-section" id="flow"><header class="section-heading"><span>01</span><div><p>SUBMISSION FLOW</p><h2>任务提交后的决策顺序</h2></div></header><ul class="goal-list"><li><span>01</span>运行线程少于 corePoolSize：创建核心线程</li><li><span>02</span>核心线程已满：尝试把任务放入队列</li><li><span>03</span>队列已满且未达 maximumPoolSize：创建额外线程</li><li><span>04</span>线程和队列都已饱和：执行拒绝策略</li></ul><div class="article-callout"><strong>maximumPoolSize 可能不生效</strong><p>使用无界队列时，任务通常会一直入队，线程数不会因为队列饱和而增长到最大值。线程参数必须与队列类型一起理解。</p></div></section>
+        <section class="article-section" id="params"><header class="section-heading"><span>02</span><div><p>SEVEN KNOBS</p><h2>核心参数分别控制什么</h2></div></header><div class="troubleshooting-list"><div><strong>corePoolSize</strong><p>常驻工作线程的目标数量，默认按任务到达逐步创建。</p><code>基础并发度</code></div><div><strong>maximumPoolSize</strong><p>队列无法接收任务时允许增长到的最大线程数量。</p><code>峰值并发上限</code></div><div><strong>keepAliveTime</strong><p>超过核心数量的空闲线程等待新任务的最长时间。</p><code>回收额外线程</code></div><div><strong>workQueue</strong><p>核心线程繁忙时保存待执行任务，容量决定可承受的排队量。</p><code>等待区</code></div><div><strong>threadFactory</strong><p>控制线程名称、优先级、守护属性及未捕获异常处理等。</p><code>可诊断性</code></div><div><strong>handler</strong><p>线程与队列均饱和或线程池关闭时，决定如何处理新任务。</p><code>过载策略</code></div></div></section>
+        <section class="article-section" id="queues"><header class="section-heading"><span>03</span><div><p>QUEUE STRATEGY</p><h2>三类队列策略</h2></div></header><div class="troubleshooting-list"><div><strong>直接移交</strong><p>SynchronousQueue 不存储任务，必须直接交给可用线程，容易快速扩容或拒绝。</p><code>SynchronousQueue</code></div><div><strong>无界队列</strong><p>可以吸收短时突发，但持续过载时队列可能不断增长并放大延迟与内存风险。</p><code>LinkedBlockingQueue()</code></div><div><strong>有界队列</strong><p>把可接受的等待任务数量显式化，便于实施背压和容量告警。</p><code>ArrayBlockingQueue</code></div><div><strong>优先队列</strong><p>任务必须具备稳定的优先级规则，同时避免低优先级任务长期饥饿。</p><code>PriorityBlockingQueue</code></div></div><p>后端服务通常更需要有界队列，因为“拒绝并快速暴露过载”往往比把请求积压到超时或内存不足更可控。</p></section>
+        <section class="article-section" id="reject"><header class="section-heading"><span>04</span><div><p>REJECTION</p><h2>拒绝策略是业务决策</h2></div></header><ul class="goal-list"><li><span>✦</span><code>AbortPolicy</code>：抛出异常，显式暴露过载</li><li><span>✦</span><code>CallerRunsPolicy</code>：由提交线程执行，形成一定反压</li><li><span>✦</span><code>DiscardPolicy</code>：静默丢弃，必须明确业务允许</li><li><span>✦</span><code>DiscardOldestPolicy</code>：丢弃队首后重试，可能破坏顺序</li></ul><div class="article-callout article-callout--muted"><strong>不要默认静默丢任务</strong><p>任务是否允许丢弃、能否重试、是否幂等、如何记录失败，需要由业务语义决定。自定义策略至少要记录指标，并避免在拒绝回调中执行不可控的阻塞操作。</p></div></section>
+        <section class="article-section" id="config"><header class="section-heading"><span>05</span><div><p>BOUNDED EXAMPLE</p><h2>一个可诊断的有界线程池</h2></div></header><div class="code-block code-block--large"><div class="code-block__label"><span>显式配置线程池</span><small>JAVA</small></div><pre><code>/**
+ * 创建用于发送通知的有界线程池。
+ */
+public final class NotificationExecutors {
+
+    private NotificationExecutors() {
+    }
+
+    /**
+     * 使用可识别的线程名称、有界队列和显式拒绝策略。
+     */
+    public static ThreadPoolExecutor create() {
+        AtomicInteger sequence = new AtomicInteger();
+        ThreadFactory factory = task -&gt; {
+            Thread thread = new Thread(task);
+            thread.setName("notification-worker-" + sequence.incrementAndGet());
+            thread.setUncaughtExceptionHandler((current, error) -&gt;
+                    System.err.println(current.getName() + ": " + error.getMessage()));
+            return thread;
+        };
+
+        return new ThreadPoolExecutor(
+                4,
+                8,
+                60,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue&lt;&gt;(200),
+                factory,
+                new ThreadPoolExecutor.AbortPolicy());
+    }
+}</code></pre></div><p>示例参数只是结构演示，不是生产默认答案。真实数值必须根据请求速率、任务耗时、下游容量、内存预算和可接受等待时间测量。</p></section>
+        <section class="article-section" id="sizing"><header class="section-heading"><span>06</span><div><p>CAPACITY PLANNING</p><h2>线程数和队列如何估算</h2></div></header><p>CPU 密集任务通常受核心数限制，I/O 密集任务会在等待期间释放 CPU 使用机会，但线程数也不能无限增加。可先用吞吐目标和任务服务时间估算在途任务，再通过压测观察 CPU、队列、上下文切换和下游负载。</p><ul class="goal-list"><li><span>01</span>记录任务平均值、P95、P99 执行时间</li><li><span>02</span>明确峰值提交速率与可接受排队时间</li><li><span>03</span>确认数据库、HTTP 下游的并发容量</li><li><span>04</span>压测时同时观察吞吐、延迟与资源曲线</li></ul><div class="article-callout"><strong>队列不是免费的缓冲区</strong><p>队列越大，拒绝发生得越晚，但过载时请求等待时间更长。容量设计应优先满足服务等级，而不是追求“永不拒绝”。</p></div></section>
+        <section class="article-section" id="observe"><header class="section-heading"><span>07</span><div><p>OPERATIONS</p><h2>监控和优雅关闭</h2></div></header><ul class="goal-list"><li><span>✦</span>当前池大小、活跃线程数、最大历史线程数</li><li><span>✦</span>队列大小、剩余容量、任务等待时间</li><li><span>✦</span>已完成任务数、拒绝次数和任务异常数</li><li><span>✦</span>shutdown 后等待既有任务，超时再 shutdownNow</li></ul><div class="code-block"><div class="code-block__label"><span>关闭流程</span><small>JAVA</small></div><pre><code>executor.shutdown();
+try {
+    // 给正在执行和排队的任务留出收尾时间
+    if (!executor.awaitTermination(30, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+    }
+} catch (InterruptedException exception) {
+    executor.shutdownNow();
+    Thread.currentThread().interrupt();
+}</code></pre></div></section>
+        <section class="article-section" id="references"><header class="section-heading"><span>08</span><div><p>SUMMARY &amp; REFERENCES</p><h2>总结与资料来源</h2></div></header><p>线程池的工程价值是管理容量：核心线程决定基础处理能力，队列承接有限等待，最大线程应对队列饱和，拒绝策略定义过载结果。没有指标和关闭流程的线程池，仍然是不完整的。</p><ul class="reference-list"><li><span>01</span><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/ThreadPoolExecutor.html" target="_blank" rel="noopener noreferrer"><strong>ThreadPoolExecutor API</strong><small>Java SE 21 &amp; JDK 21</small></a></li><li><span>02</span><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/BlockingQueue.html" target="_blank" rel="noopener noreferrer"><strong>BlockingQueue API</strong><small>Java SE 21 &amp; JDK 21</small></a></li><li><span>03</span><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/concurrent/RejectedExecutionHandler.html" target="_blank" rel="noopener noreferrer"><strong>RejectedExecutionHandler API</strong><small>Java SE 21 &amp; JDK 21</small></a></li></ul></section><div class="article-end"><span></span><strong>✦</strong><span></span><p>把过载处理写在线程池创建的那一刻</p></div>
+      </div><aside class="reading-sidebar reading-sidebar--archive"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">ARTICLE CARD</p><h2>并发档案</h2><div class="progress-orbit progress-orbit--text"><strong>POOL</strong><small>任务执行</small></div><dl class="archive-facts"><div><dt>领域</dt><dd>Java 与工程</dd></div><div><dt>系列</dt><dd>Java 并发</dd></div><div><dt>环境</dt><dd>Java 21</dd></div><div><dt>难度</dt><dd>进阶</dd></div><div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div></dl><a class="archive-action" href="../../index.html">浏览更多文章 →</a></div></aside></div></div>
+    <nav class="article-pagination"><a href="../java-memory-model-synchronized-volatile/index.html"><small>上一篇</small><strong>synchronized 与 volatile</strong></a><span>✦</span><a href="../completablefuture-guide/index.html"><small>下一篇</small><strong>CompletableFuture 异步编排</strong></a></nav>
+  </article></main><footer class="fantasy-footer"><div class="footer-copy"><p><span></span>知识如星辰，记录即永恒。<span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer></div></body></html>

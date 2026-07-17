@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="系统理解 MySQL InnoDB 索引：B+Tree、聚簇索引、二级索引、联合索引、最左前缀、覆盖索引与 EXPLAIN 验证。">
+  <meta name="keywords" content="MySQL,InnoDB,索引,B+Tree,联合索引,最左前缀,覆盖索引,EXPLAIN">
+  <meta name="article:realm" content="java-engineering">
+  <title>MySQL 索引原理：从 B+Tree 到联合索引 · Arcane Archive</title>
+  <link rel="icon" type="image/png" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-7">
+</head>
+<body>
+  <div class="detail-shell">
+    <div class="frame-lines" aria-hidden="true"></div>
+    <img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt="" aria-hidden="true">
+    <img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="" aria-hidden="true">
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="主导航">
+        <a class="brand" href="../../../index.html">
+          <img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt="" aria-hidden="true">
+          <span>xzx-wu</span><small>Arcane Archive</small>
+        </a>
+        <div class="nav-links">
+          <a href="../../../index.html">首页</a>
+          <a class="is-active" href="../../index.html" aria-current="page">知识卷轴</a>
+          <a href="../../../journeys/index.html">学习旅程</a>
+          <a href="../../../about/index.html">关于</a>
+          <a href="../../../friends/index.html">友人星图</a>
+          <a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon" aria-hidden="true"></span>GitHub</a>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero article-hero--engineering">
+          <div class="article-hero__shade" aria-hidden="true"></div>
+          <div class="article-hero__inner">
+            <div class="article-hero__copy">
+              <nav class="breadcrumb" aria-label="面包屑导航">
+                <a href="../../index.html">知识卷轴</a>
+                <span aria-hidden="true">✦</span>
+                <span>Java 与工程</span>
+              </nav>
+              <p class="article-kicker">DATABASE · INDEX DESIGN</p>
+              <h1>MySQL 索引原理<br>从 B+Tree 到联合索引</h1>
+              <p class="article-deck">理解索引如何组织数据、联合索引为什么有顺序，并用执行计划验证一次真实的索引设计。</p>
+              <div class="article-meta" aria-label="文章信息">
+                <time datetime="2026-07-17">2026-07-17</time>
+                <span>Java 与工程</span>
+                <span>MySQL</span>
+                <span>约 18 分钟阅读</span>
+              </div>
+            </div>
+            <div class="chapter-seal" aria-label="数据库系列第一篇">
+              <span>DATABASE LOG</span>
+              <strong>01</strong>
+              <small>INDEX DESIGN</small>
+            </div>
+          </div>
+        </header>
+
+        <div class="reading-stage">
+          <div class="reading-layout">
+            <aside class="reading-sidebar reading-sidebar--toc">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">CONTENTS</p>
+                <h2>本页目录</h2>
+                <nav class="article-toc" aria-label="文章目录">
+                  <a href="#purpose"><span>01</span>索引解决什么</a>
+                  <a href="#btree"><span>02</span>为什么是 B+Tree</a>
+                  <a href="#innodb"><span>03</span>InnoDB 索引</a>
+                  <a href="#composite"><span>04</span>联合索引</a>
+                  <a href="#covering"><span>05</span>覆盖索引与回表</a>
+                  <a href="#pitfalls"><span>06</span>常见误区</a>
+                  <a href="#explain"><span>07</span>执行计划验证</a>
+                  <a href="#checklist"><span>08</span>设计清单</a>
+                  <a href="#references"><span>09</span>总结与来源</a>
+                </nav>
+                <a class="back-link" href="../../index.html">← 返回知识卷轴</a>
+              </div>
+            </aside>
+
+            <div class="article-body">
+              <section class="opening-note">
+                <span class="opening-note__mark" aria-hidden="true">“</span>
+                <div>
+                  <p>索引不是“加上就会变快”的开关，而是一种用存储空间和写入成本换取查询效率的数据组织方式。</p>
+                  <small>数据库档案 · MySQL 8.x / InnoDB</small>
+                </div>
+              </section>
+
+              <section class="article-section" id="purpose">
+                <header class="section-heading">
+                  <span>01</span>
+                  <div><p>WHY INDEXES</p><h2>索引要解决什么问题</h2></div>
+                </header>
+                <p>没有合适索引时，数据库通常只能检查大量数据行，再逐条判断是否满足条件。数据量增加后，扫描行数、页读取次数和排序成本都会放大。</p>
+                <p>索引会额外维护一份有序的数据结构，使数据库能够快速定位某个值、一个范围，或者直接按照索引顺序返回结果。它常用于：</p>
+                <ul class="goal-list">
+                  <li><span aria-hidden="true">✦</span>加速 <code>WHERE</code> 精确查询和范围查询</li>
+                  <li><span aria-hidden="true">✦</span>减少关联查询需要检查的数据量</li>
+                  <li><span aria-hidden="true">✦</span>辅助 <code>ORDER BY</code> 与分组操作</li>
+                  <li><span aria-hidden="true">✦</span>通过唯一索引约束数据唯一性</li>
+                </ul>
+                <div class="article-callout article-callout--muted">
+                  <strong>索引也有成本</strong>
+                  <p>每增加一个索引，都需要额外空间，并在插入、更新和删除时同步维护。优化目标不是“索引越多越好”，而是用尽量少的索引覆盖真实的高价值查询。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="btree">
+                <header class="section-heading">
+                  <span>02</span>
+                  <div><p>DATA STRUCTURE</p><h2>为什么常用 B+Tree</h2></div>
+                </header>
+                <p>本文讨论的是 InnoDB 常见的 B+Tree 索引。索引以页为基本单位组织成多层树结构：非叶子节点主要负责导航，叶子节点保存索引记录，并按照键值顺序排列。</p>
+                <h3 class="subsection-title">适合磁盘与范围查询</h3>
+                <div class="troubleshooting-list">
+                  <div><strong>树高通常较低</strong><p>一个页可以保存大量键和子节点指针，较大的数据集也能通过较少层级完成定位。</p><code>root → branch → leaf</code></div>
+                  <div><strong>叶子节点有序</strong><p>找到范围起点后，可以沿叶子页继续读取，适合范围条件和顺序扫描。</p><code>BETWEEN / &gt; / &lt; / ORDER BY</code></div>
+                  <div><strong>查询复杂度稳定</strong><p>从根节点逐层缩小范围，不必像无索引查询那样检查大量无关记录。</p><code>按键值逐层定位</code></div>
+                  <div><strong>兼顾多种条件</strong><p>既可以查单个键，也可以查前缀、范围以及满足顺序的联合条件。</p><code>= / IN / LIKE 'abc%'</code></div>
+                </div>
+                <p>Hash 结构擅长等值定位，但天然不保留键的顺序，因此不适合直接支持范围扫描与排序。选择索引结构，取决于存储引擎和访问模式，而不是单纯比较某一次查找速度。</p>
+              </section>
+
+              <section class="article-section" id="innodb">
+                <header class="section-heading">
+                  <span>03</span>
+                  <div><p>INNODB STORAGE</p><h2>聚簇索引与二级索引</h2></div>
+                </header>
+                <p>每张 InnoDB 表都有一个聚簇索引。通常，表的主键就是聚簇索引，它的叶子节点保存完整行数据。</p>
+                <p>普通索引、唯一索引等其他索引属于二级索引。二级索引的叶子记录除了索引列，还保存对应行的主键值。需要取得索引之外的列时，InnoDB 会先通过二级索引找到主键，再到聚簇索引查找完整行，这个过程常被称为“回表”。</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>示例表结构</span><small>MYSQL</small></div>
+                  <pre><code>CREATE TABLE order_record (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '订单主键',
+  user_id BIGINT UNSIGNED NOT NULL COMMENT '用户编号',
+  status TINYINT UNSIGNED NOT NULL COMMENT '订单状态',
+  amount DECIMAL(12, 2) NOT NULL COMMENT '订单金额',
+  created_at DATETIME NOT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  KEY idx_user_status_time (user_id, status, created_at)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COMMENT = '订单记录';</code></pre>
+                </div>
+                <div class="article-callout">
+                  <strong>主键为什么不宜过长</strong>
+                  <p>二级索引记录会携带主键列。主键越宽，每个二级索引占用的空间通常也越大，因此 InnoDB 表通常更适合使用短小、稳定的主键。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="composite">
+                <header class="section-heading">
+                  <span>04</span>
+                  <div><p>COMPOSITE INDEX</p><h2>联合索引与最左前缀</h2></div>
+                </header>
+                <p>联合索引可以理解为按照多个列依次排序的索引。对于 <code>(user_id, status, created_at)</code>，先按 <code>user_id</code> 排序；相同用户内部再按 <code>status</code> 排序；前两列相同后，才按 <code>created_at</code> 排序。</p>
+                <p>因此，这个索引具备以下可用于查找的最左前缀：</p>
+                <ul class="goal-list">
+                  <li><span aria-hidden="true">✓</span><code>(user_id)</code></li>
+                  <li><span aria-hidden="true">✓</span><code>(user_id, status)</code></li>
+                  <li><span aria-hidden="true">✓</span><code>(user_id, status, created_at)</code></li>
+                  <li><span aria-hidden="true">×</span>不能把 <code>(status, created_at)</code> 当作它的最左前缀</li>
+                </ul>
+                <div class="code-block">
+                  <div class="code-block__label"><span>能够充分利用索引顺序的查询</span><small>SQL</small></div>
+                  <pre><code>SELECT id, created_at
+FROM order_record
+WHERE user_id = 10001
+  AND status = 2
+  AND created_at &gt;= '2026-07-01 00:00:00'
+ORDER BY created_at DESC
+LIMIT 20;</code></pre>
+                </div>
+                <p>索引列在 SQL 文本中的书写先后不是判断标准，优化器可以调整等值条件。关键在于联合索引内部的排序顺序，以及查询条件能否形成连续的左侧前缀。</p>
+                <div class="article-callout article-callout--muted">
+                  <strong>遇到范围条件后怎么办</strong>
+                  <p>范围列之后的索引列，通常不能继续用于缩小连续查找区间，但仍可能参与索引条件下推或覆盖查询。不要只背“范围后全部失效”，应结合执行计划确认每一列的实际作用。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="covering">
+                <header class="section-heading">
+                  <span>05</span>
+                  <div><p>COVERING INDEX</p><h2>覆盖索引与回表</h2></div>
+                </header>
+                <p>如果查询需要的列都能从当前索引记录中取得，就不需要再次访问聚簇索引，这称为覆盖索引。</p>
+                <p>示例索引包含 <code>user_id</code>、<code>status</code>、<code>created_at</code>，二级索引记录还携带主键 <code>id</code>。因此前面的查询只读取 <code>id</code> 和 <code>created_at</code> 时，可以形成覆盖查询。</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>加入非索引列后可能需要回表</span><small>SQL</small></div>
+                  <pre><code>SELECT id, created_at, amount
+FROM order_record
+WHERE user_id = 10001
+  AND status = 2
+ORDER BY created_at DESC
+LIMIT 20;</code></pre>
+                </div>
+                <p><code>amount</code> 不在该二级索引中，数据库通常需要根据索引记录里的主键回到聚簇索引读取金额。对于返回少量数据的查询，这未必是问题；当扫描和回表行数很大时，成本才会明显上升。</p>
+                <div class="article-callout">
+                  <strong>不要盲目把所有返回列塞进索引</strong>
+                  <p>覆盖索引可以减少回表，但也会增加索引宽度和写入成本。是否扩展索引，要结合查询频率、返回行数、字段大小和写入压力判断。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="pitfalls">
+                <header class="section-heading">
+                  <span>06</span>
+                  <div><p>COMMON PITFALLS</p><h2>常见索引误区</h2></div>
+                </header>
+                <div class="troubleshooting-list">
+                  <div><strong>跳过联合索引首列</strong><p>只查询 <code>status</code> 时，不能把它当作该联合索引的常规最左前缀使用。</p><code>WHERE status = 2</code></div>
+                  <div><strong>对索引列做计算</strong><p>函数或运算可能使普通索引无法直接完成定位，可考虑改写条件或使用合适的函数索引。</p><code>WHERE DATE(created_at) = ...</code></div>
+                  <div><strong>发生隐式类型转换</strong><p>字段类型与参数类型不一致时，转换发生在哪一侧会影响索引定位能力。</p><code>字符列不要传数字参数</code></div>
+                  <div><strong>前置通配符</strong><p>普通 B+Tree 索引无法从字符串开头确定查找范围。</p><code>LIKE '%keyword'</code></div>
+                  <div><strong>选择性太低</strong><p>即使存在索引，优化器也可能判断全表扫描成本更低。</p><code>需结合数据分布判断</code></div>
+                  <div><strong>只看是否用了索引</strong><p>命中索引不代表执行计划一定优秀，还要关注扫描行数、回表、排序和实际耗时。</p><code>EXPLAIN + 真实数据验证</code></div>
+                </div>
+                <div class="article-callout article-callout--muted">
+                  <strong>两条容易误导的“口诀”</strong>
+                  <p><code>IS NULL</code>、<code>!=</code>、<code>OR</code> 并非绝对不能使用索引。能否使用、是否值得使用，取决于索引结构、数据分布、查询组合和优化器成本估算。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="explain">
+                <header class="section-heading">
+                  <span>07</span>
+                  <div><p>VERIFY THE PLAN</p><h2>使用 EXPLAIN 验证</h2></div>
+                </header>
+                <p>索引设计完成后，要用执行计划验证，而不是凭感觉判断。先执行普通 <code>EXPLAIN</code>：</p>
+                <div class="code-block">
+                  <div class="code-block__label"><span>查看执行计划</span><small>SQL</small></div>
+                  <pre><code>EXPLAIN
+SELECT id, created_at
+FROM order_record
+WHERE user_id = 10001
+  AND status = 2
+  AND created_at &gt;= '2026-07-01 00:00:00'
+ORDER BY created_at DESC
+LIMIT 20;</code></pre>
+                </div>
+                <h3 class="subsection-title">重点关注这些字段</h3>
+                <ul class="goal-list">
+                  <li><span aria-hidden="true">✦</span><code>type</code>：访问方式，如 const、ref、range、index、ALL</li>
+                  <li><span aria-hidden="true">✦</span><code>key</code>：优化器最终选择的索引</li>
+                  <li><span aria-hidden="true">✦</span><code>key_len</code>：实际使用的索引键长度线索</li>
+                  <li><span aria-hidden="true">✦</span><code>rows / filtered</code>：预计检查行数与过滤比例</li>
+                  <li><span aria-hidden="true">✦</span><code>Extra</code>：覆盖索引、额外排序和条件处理信息</li>
+                  <li><span aria-hidden="true">✦</span><code>possible_keys</code>：候选索引，不等于最终采用</li>
+                </ul>
+                <p>在支持的 MySQL 8.x 环境中，还可以使用 <code>EXPLAIN ANALYZE</code> 获取实际执行过程和耗时。它会真正执行查询，在线上对高成本语句使用前必须评估影响。</p>
+                <div class="article-callout">
+                  <strong>正确理解 Extra</strong>
+                  <p><code>Using index</code> 通常表示覆盖索引；<code>Using filesort</code> 表示需要额外排序步骤，但不等于一定写入磁盘。执行计划字段要结合查询规模与实际耗时一起判断。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="checklist">
+                <header class="section-heading">
+                  <span>08</span>
+                  <div><p>DESIGN CHECKLIST</p><h2>索引设计检查清单</h2></div>
+                </header>
+                <ul class="goal-list">
+                  <li><span aria-hidden="true">01</span>从真实的高频、慢查询出发设计索引</li>
+                  <li><span aria-hidden="true">02</span>联合索引优先考虑高频等值条件和查询组合</li>
+                  <li><span aria-hidden="true">03</span>结合范围条件与排序确定列顺序</li>
+                  <li><span aria-hidden="true">04</span>评估是否需要覆盖索引，避免索引过宽</li>
+                  <li><span aria-hidden="true">05</span>删除被联合索引完整覆盖的冗余索引前先验证</li>
+                  <li><span aria-hidden="true">06</span>用 EXPLAIN 和接近生产的数据分布验证</li>
+                  <li><span aria-hidden="true">07</span>观察查询收益，也观察写入与存储成本</li>
+                  <li><span aria-hidden="true">08</span>上线后持续关注慢 SQL 与执行计划变化</li>
+                </ul>
+                <div class="reflection-prompt">
+                  <strong>一条实用原则</strong>
+                  <p>先写出要优化的 SQL，再根据过滤、关联、排序和返回列设计索引。不要脱离查询场景，孤立地讨论“应该给哪个字段加索引”。</p>
+                </div>
+              </section>
+
+              <section class="article-section" id="references">
+                <header class="section-heading">
+                  <span>09</span>
+                  <div><p>SUMMARY &amp; REFERENCES</p><h2>总结与资料来源</h2></div>
+                </header>
+                <p>理解索引需要抓住三条主线：B+Tree 负责保持有序和快速定位；InnoDB 通过聚簇索引保存行数据，二级索引携带主键；联合索引遵循内部列顺序，能否高效使用要结合最左前缀、范围条件、覆盖情况和执行计划判断。</p>
+                <ul class="reference-list">
+                  <li><span>01</span><a href="https://dev.mysql.com/doc/refman/8.4/en/innodb-index-types.html" target="_blank" rel="noopener noreferrer"><strong>Clustered and Secondary Indexes</strong><small>MySQL 8.4 Reference Manual · 聚簇索引与二级索引</small></a></li>
+                  <li><span>02</span><a href="https://dev.mysql.com/doc/refman/8.4/en/multiple-column-indexes.html" target="_blank" rel="noopener noreferrer"><strong>Multiple-Column Indexes</strong><small>MySQL 8.4 Reference Manual · 联合索引与最左前缀</small></a></li>
+                  <li><span>03</span><a href="https://dev.mysql.com/doc/refman/8.4/en/optimization-indexes.html" target="_blank" rel="noopener noreferrer"><strong>Optimization and Indexes</strong><small>MySQL 8.4 Reference Manual · 索引优化总览</small></a></li>
+                  <li><span>04</span><a href="https://dev.mysql.com/doc/refman/8.4/en/explain.html" target="_blank" rel="noopener noreferrer"><strong>EXPLAIN Statement</strong><small>MySQL 8.4 Reference Manual · 查询执行计划</small></a></li>
+                </ul>
+              </section>
+
+              <div class="article-end" aria-label="文章结束">
+                <span></span><strong>✦</strong><span></span>
+                <p>让每一个索引都能说明自己服务于哪一条查询</p>
+              </div>
+            </div>
+
+            <aside class="reading-sidebar reading-sidebar--archive">
+              <div class="sidebar-card sticky-card">
+                <p class="sidebar-kicker">ARTICLE CARD</p>
+                <h2>数据库档案</h2>
+                <div class="progress-orbit progress-orbit--text">
+                  <strong>SQL</strong>
+                  <small>索引原理</small>
+                </div>
+                <dl class="archive-facts">
+                  <div><dt>领域</dt><dd>Java 与工程</dd></div>
+                  <div><dt>系列</dt><dd>数据库基础</dd></div>
+                  <div><dt>环境</dt><dd>MySQL 8.x / InnoDB</dd></div>
+                  <div><dt>难度</dt><dd>入门至进阶</dd></div>
+                  <div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div>
+                </dl>
+                <a class="archive-action" href="../../index.html">浏览更多文章 →</a>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <nav class="article-pagination" aria-label="文章翻页">
+          <a href="../../index.html"><small>返回列表</small><strong>知识卷轴</strong></a>
+          <span aria-hidden="true">✦</span>
+          <a href="../mysql-transaction-mvcc-locks/index.html"><small>下一篇</small><strong>MySQL 事务隔离、MVCC 与锁</strong></a>
+        </nav>
+      </article>
+    </main>
+
+    <footer class="fantasy-footer"><div class="footer-copy"><p><span></span>知识如星辰，记录即永恒。<span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer>
+  </div>
+</body>
+</html>

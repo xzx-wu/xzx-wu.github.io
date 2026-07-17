@@ -1,0 +1,67 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="在 Spring MVC 中使用 Jakarta Bean Validation 校验请求，并通过 ControllerAdvice 建立稳定、可追踪的统一错误响应。"><meta name="keywords" content="Spring MVC,参数校验,异常处理,ControllerAdvice,ProblemDetail"><meta name="article:realm" content="java-engineering"><title>Spring MVC 参数校验与统一异常处理 · Arcane Archive</title><link rel="icon" href="../../../assets/images/fantasy/favicon.png"><link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-7"></head><body><div class="detail-shell"><div class="frame-lines"></div><img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt=""><header class="site-header"><nav class="site-nav"><a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt=""><span>xzx-wu</span><small>Arcane Archive</small></a><div class="nav-links"><a href="../../../index.html">首页</a><a class="is-active" href="../../index.html">知识卷轴</a><a href="../../../journeys/index.html">学习旅程</a><a href="../../../about/index.html">关于</a><a href="../../../friends/index.html">友人星图</a><a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon"></span>GitHub</a></div></nav></header>
+<main><article><header class="article-hero article-hero--engineering"><div class="article-hero__shade"></div><div class="article-hero__inner"><div class="article-hero__copy"><nav class="breadcrumb"><a href="../../index.html">知识卷轴</a><span>✦</span><span>Java 与工程</span></nav><p class="article-kicker">SPRING MVC · VALIDATION</p><h1>Spring MVC 参数校验<br>与统一异常处理</h1><p class="article-deck">校验负责阻止无效输入进入业务层，异常契约负责让调用方稳定理解失败。</p><div class="article-meta"><time datetime="2026-07-17">2026-07-17</time><span>Spring MVC</span><span>Validation</span><span>约 17 分钟阅读</span></div></div><div class="chapter-seal"><span>SPRING ARCHIVE</span><strong>19</strong><small>VALIDATION</small></div></div></header>
+<div class="reading-stage"><div class="reading-layout"><aside class="reading-sidebar reading-sidebar--toc"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2><nav class="article-toc"><a href="#layers"><span>01</span>校验分层</a><a href="#dto"><span>02</span>请求 DTO</a><a href="#controller"><span>03</span>控制器校验</a><a href="#errors"><span>04</span>错误契约</a><a href="#advice"><span>05</span>统一处理</a><a href="#security"><span>06</span>边界与安全</a><a href="#references"><span>07</span>资料来源</a></nav><a class="back-link" href="../../index.html">← 返回知识卷轴</a></div></aside>
+<div class="article-body"><section class="opening-note"><span class="opening-note__mark">“</span><div><p>格式正确不代表业务允许；输入校验、权限判断和业务规则必须位于各自边界。</p><small>Spring 档案 · Validation</small></div></section>
+<section class="article-section" id="layers"><header class="section-heading"><span>01</span><div><p>VALIDATION LAYERS</p><h2>三类校验不要混在一起</h2></div></header><div class="troubleshooting-list"><div><strong>结构校验</strong><p>必填、长度、格式、数值范围等，请求进入控制器时即可判断。</p><code>Bean Validation</code></div><div><strong>业务校验</strong><p>库存、状态流转、唯一性等需要查询或领域上下文的规则。</p><code>service</code></div><div><strong>权限与数据边界</strong><p>当前主体是否有权操作目标资源，必须由后端独立校验。</p><code>authorization</code></div></div></section>
+<section class="article-section" id="dto"><header class="section-heading"><span>02</span><div><p>REQUEST DTO</p><h2>让约束贴近输入契约</h2></div></header><div class="code-block"><div class="code-block__label"><span>CreateArticleRequest.java</span><small>JAVA</small></div><pre><code>/** 创建文章的请求参数。 */
+public class CreateArticleRequest {
+
+    /** 文章标题。 */
+    @NotBlank(message = "标题不能为空")
+    @Size(max = 120, message = "标题不能超过 120 个字符")
+    private String title;
+
+    /** 文章正文。 */
+    @NotBlank(message = "正文不能为空")
+    private String content;
+
+    // getter 与 setter 省略
+}</code></pre></div><p>输入 DTO 与持久化实体职责不同。不要为了复用而直接让实体承担外部输入约束，否则数据库字段、内部状态与 API 契约会被绑定在一起。</p></section>
+<section class="article-section" id="controller"><header class="section-heading"><span>03</span><div><p>CONTROLLER</p><h2>@Valid 与方法参数校验</h2></div></header><div class="code-block"><div class="code-block__label"><span>控制器入口</span><small>JAVA</small></div><pre><code>/** 文章管理接口。 */
+@RestController
+@RequestMapping("/api/articles")
+public class ArticleController {
+
+    /** 创建一篇文章。 */
+    @PostMapping
+    public ArticleResponse create(
+            @Valid @RequestBody CreateArticleRequest request) {
+        return articleService.create(request);
+    }
+
+    /** 按编号查询文章。 */
+    @GetMapping("/{id}")
+    public ArticleResponse find(@PathVariable @Positive Long id) {
+        return articleService.find(id);
+    }
+}</code></pre></div><p>请求体对象校验失败通常进入 <code>MethodArgumentNotValidException</code>；方法参数约束可能由 Spring MVC 方法校验生成 <code>HandlerMethodValidationException</code>。处理器应覆盖项目实际使用的两类路径。</p></section>
+<section class="article-section" id="errors"><header class="section-heading"><span>04</span><div><p>ERROR CONTRACT</p><h2>稳定错误响应包含什么</h2></div></header><div class="code-block"><div class="code-block__label"><span>错误示例</span><small>JSON</small></div><pre><code>{
+  "code": "VALIDATION_FAILED",
+  "message": "请求参数校验失败",
+  "traceId": "01J2ARCHIVE8F4",
+  "errors": [
+    {"field": "title", "message": "标题不能为空"}
+  ]
+}</code></pre></div><ul class="goal-list"><li><span>✦</span>稳定机器码用于前端分支，不依赖中文 message</li><li><span>✦</span>字段错误保留字段名和可展示信息</li><li><span>✦</span>traceId 用于关联服务端日志与链路</li><li><span>✦</span>HTTP 状态码表达协议层失败类型</li></ul></section>
+<section class="article-section" id="advice"><header class="section-heading"><span>05</span><div><p>CONTROLLER ADVICE</p><h2>集中转换异常，不吞业务语义</h2></div></header><div class="code-block"><div class="code-block__label"><span>统一处理器</span><small>JAVA</small></div><pre><code>/** 把参数校验异常转换为稳定错误响应。 */
+@RestControllerAdvice
+public class ApiExceptionHandler {
+
+    /** 处理请求体字段校验失败。 */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiError handleValidation(
+            MethodArgumentNotValidException exception) {
+        List&lt;FieldErrorItem&gt; errors = exception.getBindingResult()
+            .getFieldErrors()
+            .stream()
+            .map(error -&gt; new FieldErrorItem(
+                error.getField(), error.getDefaultMessage()))
+            .toList();
+        return ApiError.validation(errors);
+    }
+}</code></pre></div><p>不同异常要映射到明确的业务码和 HTTP 状态。未知异常记录完整堆栈后返回通用信息，不能把数据库 SQL、文件路径或内部类名暴露给客户端。</p></section>
+<section class="article-section" id="security"><header class="section-heading"><span>06</span><div><p>BOUNDARIES</p><h2>校验不能替代后端权限</h2></div></header><ul class="goal-list"><li><span>01</span>校验目标资源是否属于当前用户或组织</li><li><span>02</span>服务层再次确认状态流转和关键业务不变量</li><li><span>03</span>数据库唯一约束作为并发下的最终保证</li><li><span>04</span>日志中避免记录密码、Token 与完整敏感输入</li><li><span>05</span>批量错误数量设置上限，避免响应无限膨胀</li></ul><div class="article-callout article-callout--muted"><strong>不要把数据库异常原样返回</strong><p>唯一键冲突应被转换为稳定业务错误，但转换前要判断具体约束，不能把所有 DataIntegrityViolationException 都误报成“已存在”。</p></div></section>
+<section class="article-section" id="references"><header class="section-heading"><span>07</span><div><p>REFERENCES</p><h2>总结与资料来源</h2></div></header><p>Bean Validation 处理结构约束，服务层处理业务规则和权限边界，ControllerAdvice 将已知失败转换为稳定契约。三层职责分离后，接口才既友好又安全。</p><ul class="reference-list"><li><span>01</span><a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html" target="_blank" rel="noopener noreferrer"><strong>Validation</strong><small>Spring Web MVC Reference</small></a></li><li><span>02</span><a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-exceptionhandler.html" target="_blank" rel="noopener noreferrer"><strong>Exceptions</strong><small>Spring Web MVC Reference</small></a></li><li><span>03</span><a href="https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html" target="_blank" rel="noopener noreferrer"><strong>Error Responses</strong><small>Spring Web MVC Reference</small></a></li></ul></section><div class="article-end"><span></span><strong>✦</strong><span></span><p>在入口拒绝无效格式，在业务层守住真正的不变量</p></div></div>
+<aside class="reading-sidebar reading-sidebar--archive"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">ARTICLE CARD</p><h2>接口档案</h2><div class="progress-orbit progress-orbit--text"><strong>400</strong><small>错误契约</small></div><dl class="archive-facts"><div><dt>领域</dt><dd>Java 与工程</dd></div><div><dt>系列</dt><dd>Spring MVC</dd></div><div><dt>环境</dt><dd>Spring 6+</dd></div><div><dt>难度</dt><dd>进阶</dd></div><div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div></dl><a class="archive-action" href="../../index.html">浏览更多文章 →</a></div></aside></div></div>
+<nav class="article-pagination"><a href="../spring-aop-transaction-pitfalls/index.html"><small>上一篇</small><strong>Spring AOP 与事务失效</strong></a><span>✦</span><a href="../java-aqs-reentrantlock-condition/index.html"><small>下一篇</small><strong>AQS 与 ReentrantLock</strong></a></nav></article></main><footer class="fantasy-footer"><div class="footer-copy"><p><span></span>知识如星辰，记录即永恒。<span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer></div></body></html>

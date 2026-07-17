@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="对照 Druid 与 HikariCP 的核心参数，理解连接池容量、超时、生命周期、校验与连接泄漏排查。">
+  <meta name="keywords" content="Druid,HikariCP,数据库连接池,连接泄漏,Spring Boot">
+  <meta name="article:realm" content="java-engineering">
+  <title>Druid 与 HikariCP 核心参数及连接泄漏排查 · Arcane Archive</title>
+  <link rel="icon" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-7">
+</head>
+<body><div class="detail-shell"><div class="frame-lines"></div><img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="">
+  <header class="site-header"><nav class="site-nav"><a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt=""><span>xzx-wu</span><small>Arcane Archive</small></a><div class="nav-links"><a href="../../../index.html">首页</a><a class="is-active" href="../../index.html">知识卷轴</a><a href="../../../journeys/index.html">学习旅程</a><a href="../../../about/index.html">关于</a><a href="../../../friends/index.html">友人星图</a><a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon"></span>GitHub</a></div></nav></header>
+  <main><article><header class="article-hero article-hero--engineering"><div class="article-hero__shade"></div><div class="article-hero__inner"><div class="article-hero__copy"><nav class="breadcrumb"><a href="../../index.html">知识卷轴</a><span>✦</span><span>Java 与工程</span></nav><p class="article-kicker">DATABASE · POOL TUNING</p><h1>Druid 与 HikariCP<br>核心参数及泄漏排查</h1><p class="article-deck">参数名称不同，治理目标相同：控制并发、缩短故障暴露时间，并让连接生命周期与数据库保持一致。</p><div class="article-meta"><time datetime="2026-07-17">2026-07-17</time><span>Druid</span><span>HikariCP</span><span>约 17 分钟阅读</span></div></div><div class="chapter-seal"><span>DATABASE LOG</span><strong>09</strong><small>TUNING</small></div></div></header>
+    <div class="reading-stage"><div class="reading-layout"><aside class="reading-sidebar reading-sidebar--toc"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2><nav class="article-toc"><a href="#choice"><span>01</span>两种连接池</a><a href="#mapping"><span>02</span>参数对照</a><a href="#hikari"><span>03</span>HikariCP 配置</a><a href="#druid"><span>04</span>Druid 配置</a><a href="#lifetime"><span>05</span>生命周期</a><a href="#leak"><span>06</span>泄漏排查</a><a href="#observe"><span>07</span>观测与调优</a><a href="#references"><span>08</span>总结与来源</a></nav><a class="back-link" href="../../index.html">← 返回知识卷轴</a></div></aside>
+      <div class="article-body"><section class="opening-note"><span class="opening-note__mark">“</span><div><p>连接池调优不是追求最大的池，而是让等待、执行和数据库承载能力形成可解释的边界。</p><small>数据库档案 · Pool Tuning</small></div></section>
+        <section class="article-section" id="choice"><header class="section-heading"><span>01</span><div><p>CHOICE</p><h2>Druid 与 HikariCP 如何选择</h2></div></header><p>HikariCP 以精简实现和低开销著称，常见于 Spring Boot 默认数据源；Druid 提供较丰富的内置统计、过滤器和监控能力。选择应基于团队可观测体系、配置复杂度和既有运维经验，而不是把基准测试中的单一数字当作绝对结论。</p><div class="article-callout"><strong>先明确职责</strong><p>连接池负责管理连接与并发许可；慢 SQL 分析、数据库容量和事务设计仍需要应用监控与数据库端证据共同完成。</p></div></section>
+        <section class="article-section" id="mapping"><header class="section-heading"><span>02</span><div><p>PARAMETER MAP</p><h2>核心参数对照</h2></div></header><div class="troubleshooting-list"><div><strong>最大连接数</strong><p>HikariCP maximumPoolSize；Druid maxActive。必须乘以最大实例数核算数据库总预算。</p><code>capacity</code></div><div><strong>获取等待时间</strong><p>HikariCP connectionTimeout；Druid maxWait。它限制的是从池中获取连接的等待。</p><code>borrow timeout</code></div><div><strong>最小空闲数</strong><p>HikariCP minimumIdle；Druid minIdle。避免为了“看起来稳定”盲目预建过多连接。</p><code>idle floor</code></div><div><strong>连接寿命</strong><p>HikariCP maxLifetime；Druid 通过连接生存与空闲淘汰相关参数管理。应短于基础设施强制断连时间。</p><code>lifetime</code></div><div><strong>连接校验</strong><p>HikariCP 优先使用 JDBC4 isValid；Druid 常配置 validationQuery 与 testWhileIdle。</p><code>validation</code></div><div><strong>泄漏诊断</strong><p>HikariCP leakDetectionThreshold；Druid removeAbandoned、logAbandoned。诊断参数不是业务修复方案。</p><code>diagnostics</code></div></div></section>
+        <section class="article-section" id="hikari"><header class="section-heading"><span>03</span><div><p>HIKARICP</p><h2>Spring Boot 中的 HikariCP 示例</h2></div></header><div class="code-block"><div class="code-block__label"><span>application.yml</span><small>YAML</small></div><pre><code>spring:
+  datasource:
+    url: jdbc:mysql://db.example:3306/archive
+    username: archive_app
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 3000
+      validation-timeout: 1000
+      idle-timeout: 600000
+      max-lifetime: 1700000
+      leak-detection-threshold: 60000</code></pre></div><p>示例值不能直接复制到生产。尤其是 <code>maximum-pool-size</code> 必须结合实例数和数据库上限计算；<code>leak-detection-threshold</code> 适合在诊断期间识别异常持有，不应设得短于正常长事务。</p></section>
+        <section class="article-section" id="druid"><header class="section-heading"><span>04</span><div><p>DRUID</p><h2>Spring Boot 中的 Druid 示例</h2></div></header><div class="code-block"><div class="code-block__label"><span>application.yml</span><small>YAML</small></div><pre><code>spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 3000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000</code></pre></div><p>Druid Starter 的属性前缀和支持项可能随版本变化，应以所用版本文档为准。对每次借用都执行校验会增加数据库压力，通常先采用空闲检测，并结合驱动与网络环境验证。</p></section>
+        <section class="article-section" id="lifetime"><header class="section-heading"><span>05</span><div><p>LIFETIME</p><h2>让连接寿命短于外部断连时间</h2></div></header><p>数据库、代理、负载均衡或防火墙可能按空闲时间或绝对寿命关闭连接。若池仍把连接视为可用，下一次借用才会暴露错误。连接池的最长寿命应留出抖动余量，主动在外部设施之前更新连接。</p><ul class="goal-list"><li><span>01</span>确认数据库和网络层的 idle timeout</li><li><span>02</span>设置稍短的池内 maxLifetime 或淘汰策略</li><li><span>03</span>避免所有连接同时到期造成重建风暴</li><li><span>04</span>监控连接创建率、关闭率和校验失败率</li></ul></section>
+        <section class="article-section" id="leak"><header class="section-heading"><span>06</span><div><p>LEAK INVESTIGATION</p><h2>连接泄漏排查顺序</h2></div></header><div class="troubleshooting-list"><div><strong>确认池是否真的饱和</strong><p>同时查看 active、idle、pending、timeout，而不是只看最大连接数。</p><code>metrics</code></div><div><strong>查找长时间持有者</strong><p>使用泄漏日志或 APM 事务跨度定位借用堆栈和持有时间。</p><code>borrow stack</code></div><div><strong>检查事务边界</strong><p>关注远程调用、循环、锁等待和异常分支是否发生在事务中。</p><code>transaction scope</code></div><div><strong>核对数据库会话</strong><p>确认长事务、锁等待和慢 SQL，区分未归还与执行过慢。</p><code>database evidence</code></div></div><div class="article-callout article-callout--muted"><strong>不要用强制回收掩盖问题</strong><p>自动关闭“疑似泄漏”连接可能中断仍在执行的事务。先将诊断证据关联到代码路径，再修复资源关闭或缩短事务。</p></div></section>
+        <section class="article-section" id="observe"><header class="section-heading"><span>07</span><div><p>OBSERVABILITY</p><h2>从指标反推配置</h2></div></header><ul class="goal-list"><li><span>✦</span>获取连接等待时长及其 P95、P99</li><li><span>✦</span>活跃、空闲、等待线程和获取超时数量</li><li><span>✦</span>连接创建、关闭、校验失败与使用时长</li><li><span>✦</span>SQL 延迟、事务时长、数据库 CPU 与锁等待</li><li><span>✦</span>按应用实例数核算总连接数和扩容后的上限</li></ul><p>如果等待增加但数据库仍有余量，可以评估小幅扩池；如果数据库 CPU、I/O 或锁竞争已经饱和，扩大池只会提高并发压力。</p></section>
+        <section class="article-section" id="references"><header class="section-heading"><span>08</span><div><p>SUMMARY &amp; REFERENCES</p><h2>总结与资料来源</h2></div></header><p>HikariCP 和 Druid 的关键配置都围绕容量、等待、校验、空闲和寿命。调优应以总连接预算和真实指标为起点，泄漏检测用于定位代码与事务问题，不负责替代修复。</p><ul class="reference-list"><li><span>01</span><a href="https://github.com/brettwooldridge/HikariCP" target="_blank" rel="noopener noreferrer"><strong>HikariCP Documentation</strong><small>Official repository and configuration guide</small></a></li><li><span>02</span><a href="https://github.com/alibaba/druid/wiki/DruidDataSource%E9%85%8D%E7%BD%AE%E5%B1%9E%E6%80%A7%E5%88%97%E8%A1%A8" target="_blank" rel="noopener noreferrer"><strong>DruidDataSource 配置属性列表</strong><small>Alibaba Druid Wiki</small></a></li><li><span>03</span><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/DataSource.html" target="_blank" rel="noopener noreferrer"><strong>DataSource API</strong><small>Java SE 21</small></a></li></ul></section><div class="article-end"><span></span><strong>✦</strong><span></span><p>用指标配置连接池，用事务边界解决连接泄漏</p></div>
+      </div><aside class="reading-sidebar reading-sidebar--archive"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">ARTICLE CARD</p><h2>调优档案</h2><div class="progress-orbit progress-orbit--text"><strong>POOL</strong><small>参数治理</small></div><dl class="archive-facts"><div><dt>领域</dt><dd>Java 与工程</dd></div><div><dt>系列</dt><dd>连接池</dd></div><div><dt>环境</dt><dd>Spring Boot</dd></div><div><dt>难度</dt><dd>进阶</dd></div><div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div></dl><a class="archive-action" href="../../index.html">浏览更多文章 →</a></div></aside></div></div>
+    <nav class="article-pagination"><a href="../database-connection-pool-principles/index.html"><small>上一篇</small><strong>数据库连接池工作原理</strong></a><span>✦</span><a href="../jvm-memory-object-lifecycle/index.html"><small>下一篇</small><strong>JVM 内存与对象生命周期</strong></a></nav>
+  </article></main><footer class="fantasy-footer"><div class="footer-copy"><p><span></span>知识如星辰，记录即永恒。<span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer></div></body></html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="使用 uptime、top、pidstat、vmstat、iostat 与 sar 建立 Linux CPU、内存和 I/O 故障定位流程，并避免常见指标误判。">
+  <meta name="keywords" content="Linux,top,pidstat,vmstat,iostat,sar,性能排查">
+  <meta name="article:realm" content="operations-observability">
+  <title>Linux CPU、内存与 I/O 诊断 · Arcane Archive</title>
+  <link rel="icon" href="../../../assets/images/fantasy/favicon.png"><link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-7">
+</head>
+<body><div class="detail-shell"><div class="frame-lines"></div><img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="">
+<header class="site-header"><nav class="site-nav"><a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt=""><span>xzx-wu</span><small>Arcane Archive</small></a><div class="nav-links"><a href="../../../index.html">首页</a><a class="is-active" href="../../index.html">知识卷轴</a><a href="../../../journeys/index.html">学习旅程</a><a href="../../../about/index.html">关于</a><a href="../../../friends/index.html">友人星图</a><a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon"></span>GitHub</a></div></nav></header>
+<main><article><header class="article-hero article-hero--engineering"><div class="article-hero__shade"></div><div class="article-hero__inner"><div class="article-hero__copy"><nav class="breadcrumb"><a href="../../index.html">知识卷轴</a><span>✦</span><span>运维与可观测性</span></nav><p class="article-kicker">LINUX · RESOURCE DIAGNOSTICS</p><h1>CPU、内存<br>与 I/O 诊断</h1><p class="article-deck">从系统负载到进程、线程、内存回收和块设备，按层建立证据，避免只看到一个高指标就下结论。</p><div class="article-meta"><time datetime="2026-07-17">2026-07-17</time><span>Linux</span><span>资源诊断</span><span>约 18 分钟阅读</span></div></div><div class="chapter-seal"><span>OPERATIONS FIELD GUIDE</span><strong>43</strong><small>CPU · MEM · IO</small></div></div></header>
+<div class="reading-stage"><div class="reading-layout"><aside class="reading-sidebar reading-sidebar--toc"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2><nav class="article-toc"><a href="#baseline"><span>01</span>现场基线</a><a href="#cpu"><span>02</span>CPU</a><a href="#memory"><span>03</span>内存</a><a href="#io"><span>04</span>I/O</a><a href="#history"><span>05</span>历史指标</a><a href="#workflow"><span>06</span>排查流程</a><a href="#references"><span>07</span>资料来源</a></nav><a class="back-link" href="../../index.html">← 返回知识卷轴</a></div></aside>
+<div class="article-body"><section class="opening-note"><span class="opening-note__mark">“</span><div><p>系统性能指标只有放在时间、负载、资源限制和业务现象中才有意义。</p><small>运维档案 · Resource Diagnostics</small></div></section>
+<section class="article-section" id="baseline"><header class="section-heading"><span>01</span><div><p>BASELINE</p><h2>先记录主机与故障窗口</h2></div></header><div class="code-block"><div class="code-block__label"><span>最小现场信息</span><small>SHELL</small></div><pre><code>date
+uptime
+uname -a
+nproc
+free -h
+df -h
+ps -eo pid,ppid,comm,%cpu,%mem --sort=-%cpu | head</code></pre></div><ul class="goal-list"><li><span>✦</span>记录告警时间、主机、容器、版本、流量与最近发布</li><li><span>✦</span>确认 CPU 核数、内存、磁盘和 cgroup 限制</li><li><span>✦</span>区分主机资源紧张和单个进程异常</li><li><span>✦</span>多次采样而不是依赖命令输出的第一行</li></ul><p><code>vmstat</code> 等工具的第一行常表示自开机以来平均值，后续行才对应指定采样间隔，应区别解读。</p></section>
+<section class="article-section" id="cpu"><header class="section-heading"><span>02</span><div><p>CPU</p><h2>从整体利用率下钻到线程</h2></div></header><div class="code-block"><div class="code-block__label"><span>CPU 采样组合</span><small>SHELL</small></div><pre><code>top
+top -H -p 2468
+pidstat -u -p 2468 1 10
+pidstat -t -u -p 2468 1 10
+vmstat 1 10</code></pre></div><div class="troubleshooting-list"><div><strong>us</strong><p>用户态 CPU，高时下钻业务线程与方法热点。</p><code>application</code></div><div><strong>sy</strong><p>内核态 CPU，关注系统调用、网络、上下文切换。</p><code>kernel</code></div><div><strong>wa</strong><p>CPU 等待 I/O 的时间比例，需要结合设备延迟确认。</p><code>iowait</code></div><div><strong>st</strong><p>虚拟化环境中被宿主机拿走的 CPU 时间。</p><code>steal</code></div></div><p>Load Average 包含可运行任务和不可中断睡眠任务，并不等同 CPU 使用率。高 Load 既可能是 CPU 排队，也可能是 I/O 阻塞。</p></section>
+<section class="article-section" id="memory"><header class="section-heading"><span>03</span><div><p>MEMORY</p><h2>重点看 Available、回收与交换</h2></div></header><div class="code-block"><div class="code-block__label"><span>内存与缺页采样</span><small>SHELL</small></div><pre><code>free -h
+vmstat 1 10
+pidstat -r -p 2468 1 10
+cat /proc/2468/status
+cat /proc/2468/smaps_rollup</code></pre></div><ul class="goal-list"><li><span>01</span><code>MemAvailable</code> 比单看 free 更接近系统还能提供的内存</li><li><span>02</span><code>si/so</code> 持续出现说明正在发生 Swap 读写</li><li><span>03</span>RSS 包含进程驻留页，不应直接等同 Java 堆</li><li><span>04</span>主缺页、内存回收和 OOM 日志用于判断压力来源</li><li><span>05</span>容器需同时查看 cgroup 限制与使用量</li></ul><div class="article-callout"><strong>Linux 使用缓存不是泄漏</strong><p>Page Cache 会利用空闲内存提升 I/O。只有结合 Available 下降、持续回收、Swap、OOM 或进程 RSS 增长，才能判断是否存在内存压力。</p></div></section>
+<section class="article-section" id="io"><header class="section-heading"><span>04</span><div><p>BLOCK I/O</p><h2>查看吞吐、延迟、队列与请求大小</h2></div></header><div class="code-block"><div class="code-block__label"><span>设备与进程 I/O</span><small>SHELL</small></div><pre><code>iostat -xz 1 10
+pidstat -d -p 2468 1 10
+df -h
+df -i</code></pre></div><ul class="goal-list"><li><span>✦</span><strong>r/s、w/s：</strong>每秒读写请求数量</li><li><span>✦</span><strong>rkB/s、wkB/s：</strong>读写吞吐</li><li><span>✦</span><strong>await：</strong>请求完成的平均等待时间</li><li><span>✦</span><strong>aqu-sz：</strong>平均队列长度</li><li><span>✦</span><strong>%util：</strong>设备忙碌程度，需要结合设备类型解释</li></ul><p>现代 SSD、RAID、云盘和并行设备上，不能仅凭 <code>%util=100</code> 宣判饱和。还要结合延迟、队列、吞吐上限和云平台指标。</p></section>
+<section class="article-section" id="history"><header class="section-heading"><span>05</span><div><p>HISTORY</p><h2>用 sar 回看故障发生时刻</h2></div></header><div class="code-block"><div class="code-block__label"><span>历史与实时数据</span><small>SHELL</small></div><pre><code>sar -u 1 10
+sar -r 1 10
+sar -q 1 10
+sar -d 1 10
+
+# 读取已配置采集的某天历史文件
+sar -u -f /var/log/sa/sa17</code></pre></div><p>sysstat 套件包含 sar、iostat、pidstat 和 mpstat。历史能力依赖系统已提前配置采集任务；故障发生后才安装工具无法恢复过去未采集的数据。</p></section>
+<section class="article-section" id="workflow"><header class="section-heading"><span>06</span><div><p>DECISION FLOW</p><h2>资源问题排查顺序</h2></div></header><ol class="goal-list"><li><span>01</span>对齐业务告警、系统指标和发布变更时间</li><li><span>02</span>用 uptime、vmstat 判断 CPU 排队还是 I/O 阻塞</li><li><span>03</span>用 pidstat 找出贡献最大的进程和线程</li><li><span>04</span>CPU 问题转入线程栈、JFR 或火焰图</li><li><span>05</span>内存问题对比 RSS、堆、Native 与 cgroup</li><li><span>06</span>I/O 问题关联具体进程、文件、设备和外部存储</li><li><span>07</span>保存采样参数和原始输出，修复后按同条件复测</li></ol></section>
+<section class="article-section" id="references"><header class="section-heading"><span>07</span><div><p>REFERENCES</p><h2>总结与资料来源</h2></div></header><p>Linux 资源诊断要从系统整体逐层下钻到进程、线程和设备，并用连续采样与历史基线避免单指标误判。</p><ul class="reference-list"><li><span>01</span><a href="https://man7.org/linux/man-pages/man1/top.1.html" target="_blank" rel="noopener noreferrer"><strong>top(1)</strong><small>Linux Manual Page</small></a></li><li><span>02</span><a href="https://www.man7.org/linux/man-pages/man8/vmstat.8.html" target="_blank" rel="noopener noreferrer"><strong>vmstat(8)</strong><small>Linux Manual Page</small></a></li><li><span>03</span><a href="https://github.com/sysstat/sysstat" target="_blank" rel="noopener noreferrer"><strong>sysstat</strong><small>Official Project · sar, iostat, pidstat</small></a></li><li><span>04</span><a href="https://man7.org/linux/man-pages/man1/free.1.html" target="_blank" rel="noopener noreferrer"><strong>free(1)</strong><small>Linux Manual Page</small></a></li></ul></section><div class="article-end"><span></span><strong>✦</strong><span></span><p>从整体到进程再到线程和设备，让指标形成因果证据链</p></div></div>
+<aside class="reading-sidebar reading-sidebar--archive"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">ARTICLE CARD</p><h2>运维档案</h2><div class="progress-orbit progress-orbit--text"><strong>SYS</strong><small>资源诊断</small></div><dl class="archive-facts"><div><dt>领域</dt><dd>运维与可观测性</dd></div><div><dt>系列</dt><dd>Linux 排障</dd></div><div><dt>主题</dt><dd>CPU / 内存 / I/O</dd></div><div><dt>难度</dt><dd>进阶</dd></div><div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div></dl><a class="archive-action" href="../../index.html">浏览更多文章 →</a></div></aside></div></div>
+<nav class="article-pagination"><a href="../async-profiler-flamegraph/index.html"><small>上一篇</small><strong>async-profiler 火焰图</strong></a><span>✦</span><a href="../linux-network-diagnostics/index.html"><small>下一篇</small><strong>Linux 网络诊断</strong></a></nav></article></main><footer class="fantasy-footer"><div class="footer-copy"><p><span></span>知识如星辰，记录即永恒。<span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer></div></body></html>

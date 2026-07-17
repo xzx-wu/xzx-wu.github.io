@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="从访问模式出发设计 MongoDB 文档，权衡嵌入与引用，并用复合索引、字段顺序、覆盖查询和 schema validation 控制演进。">
+  <meta name="keywords" content="MongoDB,文档模型,索引,Schema Validation,复合索引">
+  <meta name="article:realm" content="java-engineering">
+  <title>MongoDB 文档模型与索引设计 · Arcane Archive</title>
+  <link rel="icon" href="../../../assets/images/fantasy/favicon.png">
+  <link rel="stylesheet" href="../../../assets/css/fantasy-article.css?v=20260717-7">
+</head>
+<body><div class="detail-shell"><div class="frame-lines"></div><img class="frame-corner frame-corner--tl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--tr" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--bl" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-corner frame-corner--br" src="../../../assets/images/fantasy/frame-corner.webp" alt=""><img class="frame-crown" src="../../../assets/images/fantasy/frame-crown.webp" alt="">
+<header class="site-header"><nav class="site-nav"><a class="brand" href="../../../index.html"><img class="brand-mark" src="../../../assets/images/fantasy/brand-crest.webp" alt=""><span>xzx-wu</span><small>Arcane Archive</small></a><div class="nav-links"><a href="../../../index.html">首页</a><a class="is-active" href="../../index.html">知识卷轴</a><a href="../../../journeys/index.html">学习旅程</a><a href="../../../about/index.html">关于</a><a href="../../../friends/index.html">友人星图</a><a class="github-link" href="https://github.com/xzx-wu" target="_blank" rel="noopener noreferrer"><span class="github-icon"></span>GitHub</a></div></nav></header>
+<main><article><header class="article-hero article-hero--engineering"><div class="article-hero__shade"></div><div class="article-hero__inner"><div class="article-hero__copy"><nav class="breadcrumb"><a href="../../index.html">知识卷轴</a><span>✦</span><span>Java 与工程</span></nav><p class="article-kicker">MONGODB · DATA MODELING</p><h1>文档模型<br>与索引设计</h1><p class="article-deck">MongoDB 的灵活 schema 不等于无需建模。文档边界、数组增长和索引顺序都应由真实访问模式决定。</p><div class="article-meta"><time datetime="2026-07-17">2026-07-17</time><span>MongoDB</span><span>数据建模</span><span>约 17 分钟阅读</span></div></div><div class="chapter-seal"><span>DOCUMENT ATLAS</span><strong>34</strong><small>MODELING</small></div></div></header>
+<div class="reading-stage"><div class="reading-layout"><aside class="reading-sidebar reading-sidebar--toc"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">CONTENTS</p><h2>本页目录</h2><nav class="article-toc"><a href="#access"><span>01</span>访问模式</a><a href="#embed"><span>02</span>嵌入与引用</a><a href="#schema"><span>03</span>Schema 演进</a><a href="#indexes"><span>04</span>索引类型</a><a href="#compound"><span>05</span>复合索引</a><a href="#verify"><span>06</span>验证设计</a><a href="#references"><span>07</span>资料来源</a></nav><a class="back-link" href="../../index.html">← 返回知识卷轴</a></div></aside>
+<div class="article-body"><section class="opening-note"><span class="opening-note__mark">“</span><div><p>文档模型不是把关系表换成 JSON，而是让一次业务读写拥有清晰边界。</p><small>文档档案 · Modeling</small></div></section>
+<section class="article-section" id="access"><header class="section-heading"><span>01</span><div><p>WORKLOAD FIRST</p><h2>先列出读写模式</h2></div></header><ul class="goal-list"><li><span>✦</span>哪些字段总是一起读取，哪些只在详情页读取</li><li><span>✦</span>写入是整体替换、局部更新，还是持续追加数组</li><li><span>✦</span>关系是一对一、一对少量，还是无界一对多</li><li><span>✦</span>查询需要哪些过滤、排序、分页和聚合</li><li><span>✦</span>数据保留多久，是否需要 TTL、归档或分片</li></ul><p>只有把高频请求、结果大小和增长上限写出来，才能判断哪些信息适合放在同一文档中。</p></section>
+<section class="article-section" id="embed"><header class="section-heading"><span>02</span><div><p>EMBED OR REFERENCE</p><h2>嵌入优化局部性，引用控制增长</h2></div></header><div class="troubleshooting-list"><div><strong>适合嵌入</strong><p>生命周期一致、经常一起读取、数量有界，并希望单文档原子更新。</p><code>order + snapshot items</code></div><div><strong>适合引用</strong><p>实体独立复用、独立更新、关系规模大或数组可能无界增长。</p><code>authorId / productId</code></div><div><strong>适度冗余</strong><p>复制稳定展示字段换取少一次查询，同时建立明确更新机制。</p><code>name snapshot</code></div></div><div class="article-callout"><strong>无界数组是危险信号</strong><p>日志、消息、评论等持续增长集合通常应拆成独立 collection，通过父实体标识查询，而不是无限追加到一个文档。</p></div></section>
+<section class="article-section" id="schema"><header class="section-heading"><span>03</span><div><p>SCHEMA EVOLUTION</p><h2>灵活结构也要有契约</h2></div></header><div class="code-block"><div class="code-block__label"><span>集合验证示例</span><small>MONGOSH</small></div><pre><code>db.createCollection("orders", {
+  validator: {
+    $jsonSchema: {
+      bsonType: "object",
+      required: ["userId", "status", "createdAt"],
+      properties: {
+        status: { enum: ["CREATED", "PAID", "CLOSED"] },
+        schemaVersion: { bsonType: "int" }
+      }
+    }
+  }
+})</code></pre></div><p>应用读取旧文档时应兼容明确版本，并通过可重试脚本渐进迁移。不要依赖每次读取都隐式修复，否则写放大和失败重试会变得难以追踪。</p></section>
+<section class="article-section" id="indexes"><header class="section-heading"><span>04</span><div><p>INDEX TYPES</p><h2>索引服务于查询，不服务于字段数量</h2></div></header><ul class="goal-list"><li><span>01</span>单字段索引处理单一过滤或排序</li><li><span>02</span>复合索引覆盖固定组合的过滤与排序</li><li><span>03</span>数组字段索引会成为 multikey，需评估条目放大</li><li><span>04</span>部分索引只收录满足条件的文档，减少体积</li><li><span>05</span>TTL 索引按时间自动清理适合会话、临时事件等数据</li></ul><p>每个索引都会占用内存和磁盘，并增加写入维护成本。低价值重复索引应通过查询证据和使用统计审查后移除。</p></section>
+<section class="article-section" id="compound"><header class="section-heading"><span>05</span><div><p>COMPOUND INDEX</p><h2>字段顺序决定可利用的前缀</h2></div></header><div class="code-block"><div class="code-block__label"><span>订单列表索引</span><small>MONGOSH</small></div><pre><code>db.orders.createIndex({
+  userId: 1,
+  status: 1,
+  createdAt: -1,
+  _id: -1
+})
+
+db.orders.find({ userId: 1001, status: "PAID" })
+  .sort({ createdAt: -1, _id: -1 })
+  .limit(20)</code></pre></div><p>常用经验是先等值字段，再考虑排序和范围字段，但最终要用实际过滤组合、选择性和 explain 验证。复合索引通常支持其前缀，跳过前导字段会削弱利用效果。</p></section>
+<section class="article-section" id="verify"><header class="section-heading"><span>06</span><div><p>VERIFICATION</p><h2>用真实数据规模验证</h2></div></header><ul class="goal-list"><li><span>✦</span>准备接近生产分布的数据，而不是几十条样例</li><li><span>✦</span>检查 explain 中扫描文档、索引键和返回数量</li><li><span>✦</span>验证排序是否由索引完成，分页是否保持稳定顺序</li><li><span>✦</span>评估文档平均大小、最大增长、索引总量与工作集</li><li><span>✦</span>在读写混合压测中观察 P95/P99 延迟和复制压力</li></ul></section>
+<section class="article-section" id="references"><header class="section-heading"><span>07</span><div><p>REFERENCES</p><h2>总结与资料来源</h2></div></header><p>MongoDB 建模要从访问模式、原子边界与增长上限出发。索引只为明确查询建立，并通过真实数据的 explain 和负载测试证明价值。</p><ul class="reference-list"><li><span>01</span><a href="https://www.mongodb.com/docs/manual/data-modeling/" target="_blank" rel="noopener noreferrer"><strong>Data Modeling</strong><small>MongoDB Manual</small></a></li><li><span>02</span><a href="https://www.mongodb.com/docs/manual/indexes/" target="_blank" rel="noopener noreferrer"><strong>Indexes</strong><small>MongoDB Manual</small></a></li><li><span>03</span><a href="https://www.mongodb.com/docs/manual/core/indexes/index-types/index-compound/" target="_blank" rel="noopener noreferrer"><strong>Compound Indexes</strong><small>MongoDB Manual</small></a></li><li><span>04</span><a href="https://www.mongodb.com/docs/manual/core/schema-validation/" target="_blank" rel="noopener noreferrer"><strong>Schema Validation</strong><small>MongoDB Manual</small></a></li></ul></section><div class="article-end"><span></span><strong>✦</strong><span></span><p>围绕访问模式划定文档边界，用执行证据决定索引</p></div></div>
+<aside class="reading-sidebar reading-sidebar--archive"><div class="sidebar-card sticky-card"><p class="sidebar-kicker">ARTICLE CARD</p><h2>文档档案</h2><div class="progress-orbit progress-orbit--text"><strong>DOC</strong><small>模型与索引</small></div><dl class="archive-facts"><div><dt>领域</dt><dd>Java 与工程</dd></div><div><dt>系列</dt><dd>MongoDB</dd></div><div><dt>主题</dt><dd>文档建模</dd></div><div><dt>难度</dt><dd>进阶</dd></div><div><dt>状态</dt><dd><span class="status-dot"></span>已整理</dd></div></dl><a class="archive-action" href="../../index.html">浏览更多文章 →</a></div></aside></div></div>
+<nav class="article-pagination"><a href="../redis-persistence-replication-sentinel-cluster/index.html"><small>上一篇</small><strong>Redis 持久化与高可用</strong></a><span>✦</span><a href="../mongodb-transactions-replica-read-write-concern/index.html"><small>下一篇</small><strong>MongoDB 事务与副本集</strong></a></nav></article></main><footer class="fantasy-footer"><div class="footer-copy"><p><span></span>知识如星辰，记录即永恒。<span></span></p><small>© 2026 xzx-wu · Arcane Archive</small></div></footer></div></body>
+</html>
